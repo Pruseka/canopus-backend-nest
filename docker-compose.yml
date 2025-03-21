@@ -8,3 +8,20 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: canopus
+
+  # canopus-api:
+  #   build: .
+  #   restart: always
+  #   depends_on:
+  #     - canopus-dev-db
+  #   ports:
+  #     - '4000:4000'
+  #     - '5555:5555'
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     NODE_ENV: production
+  #   command: ['npm', 'run', 'start:prod']
+
+volumes:
+  pgdata:
