@@ -1,4 +1,4 @@
-import { TokensResponse } from './interfaces/tokens-response.interface';
+import { TokensResponseDto } from './interfaces/tokens-response.interface';
 import {
   Body,
   Controller,
@@ -10,14 +10,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { AuthDto } from './dto';
-import { Public } from './decorators/public.decorator';
-import { Response, response } from 'express';
-import { GetCurrentUser } from './decorators/get-current-user.decorator';
-import { User } from '@prisma/client';
+import { AuthDto, AuthResponseDto } from './dto';
+import { Public } from './decorators';
+import { Response } from 'express';
+import { GetCurrentUser } from './decorators';
 import { ConfigService } from '@nestjs/config';
 import { RefreshTokenGuard } from './guard';
-import { GetCurrentUserId } from './decorators/get-current-user-id.decorator';
+import { GetCurrentUserId } from './decorators';
+import { ApiResponse } from '@nestjs/swagger';
+import { UserEntity } from 'src/user/entities';
 
 @Controller('auth')
 export class AuthController {
@@ -27,29 +28,42 @@ export class AuthController {
   ) {}
 
   @Public()
+  @ApiResponse({
+    status: 201,
+    description: 'Sign up',
+    type: AuthResponseDto,
+  })
   @Post('signup')
-  signUp(@Body() dto: AuthDto) {
-    return this.authService.signUp(dto);
+  async signUp(
+    @Body() dto: AuthDto,
+  ): Promise<{ tokens: TokensResponseDto; user: UserEntity }> {
+    const { tokens, user } = await this.authService.signUp(dto);
+
+    const userWithoutPassword = new UserEntity(user);
+
+    return {
+      tokens,
+      user: userWithoutPassword,
+    };
   }
 
   @Public()
+  @ApiResponse({ status: 200, description: 'Sign in', type: AuthResponseDto })
   @HttpCode(HttpStatus.OK)
   @Post('signin')
   async signIn(
     @Body() dto: AuthDto,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<{ tokens: TokensResponse; user: Partial<User> }> {
+  ): Promise<{ tokens: TokensResponseDto; user: UserEntity }> {
     const { tokens, user } = await this.authService.signIn(dto);
 
     this.setRefreshTokenCookie(response, tokens.refreshToken);
 
+    const userWithoutPassword = new UserEntity(user);
+
     return {
       tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      },
+      user: userWithoutPassword,
     };
   }
 
@@ -74,7 +88,7 @@ export class AuthController {
   }
 
   @Get('profile')
-  getProfile(@GetCurrentUser() user: User) {
+  getProfile(@GetCurrentUser() user: UserEntity) {
     return user;
   }
 

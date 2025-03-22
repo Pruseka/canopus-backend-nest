@@ -8,6 +8,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: canopus
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'postgres']
+      interval: 10s
+      retries: 5
 
   # canopus-api:
   #   build: .
@@ -16,7 +22,7 @@ services:
   #     - canopus-dev-db
   #   ports:
   #     - '4000:4000'
-  #     - '5555:5555'
+
   #   env_file:
   #     - .env
   #   environment:

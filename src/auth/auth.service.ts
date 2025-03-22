@@ -9,10 +9,12 @@ import * as argon from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { TokensResponse } from './interfaces/tokens-response.interface';
+import { TokensResponseDto } from './interfaces/tokens-response.interface';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { UserService } from 'src/user/user.service';
-import { User } from '@prisma/client';
+import { SignupErrorException } from './exceptions/sign-up-error.exception';
+import { UserEntity } from 'src/user/entities/';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class AuthService {
@@ -22,25 +24,32 @@ export class AuthService {
     private config: ConfigService,
     private user: UserService,
   ) {}
-  async signUp(dto: AuthDto) {
+  async signUp(
+    dto: AuthDto,
+  ): Promise<{ tokens: TokensResponseDto; user: UserEntity }> {
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+    });
+
+    if (existingUser)
+      throw new UnauthorizedException(
+        'credentials_taken',
+        'The user with this email already exists',
+      );
+
     const hash = await argon.hash(dto.password);
 
-    try {
-      const user = await this.prisma.user.create({
-        data: {
-          email: dto.email,
-          password: hash,
-        },
-      });
+    const user = await this.prisma.user.create({
+      data: {
+        name: dto.name,
+        email: dto.email,
+        password: hash,
+      },
+    });
 
-      return this.signToken(user);
-    } catch (error) {
-      if (error instanceof PrismaClientKnownRequestError) {
-        if (error.code === 'P2002') {
-          throw new ForbiddenException('Credentials taken');
-        }
-      }
-    }
+    return this.signToken(user);
   }
 
   async signIn(dto: AuthDto) {
@@ -59,7 +68,10 @@ export class AuthService {
     return this.signToken(user);
   }
 
-  async signToken(user: User): Promise<{ tokens: TokensResponse; user: User }> {
+  async signToken(user: UserEntity): Promise<{
+    tokens: TokensResponseDto;
+    user: UserEntity;
+  }> {
     const tokens = await this.getTokens(user.id, user.email);
 
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
@@ -70,7 +82,7 @@ export class AuthService {
   async refreshTokens(
     userId: string,
     refreshToken: string,
-  ): Promise<TokensResponse> {
+  ): Promise<TokensResponseDto> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     if (!user || !user.refreshToken) {
@@ -96,7 +108,7 @@ export class AuthService {
   private async getTokens(
     userId: string,
     email: string,
-  ): Promise<TokensResponse> {
+  ): Promise<TokensResponseDto> {
     const jwtPayload: JwtPayload = {
       sub: userId,
       email,
@@ -127,5 +139,10 @@ export class AuthService {
     const hashedRefreshToken = await argon.hash(refreshToken);
 
     await this.user.updateRefreshToken(userId, hashedRefreshToken);
+  }
+
+  private isPasswordValid(password: string): boolean {
+    const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+    return passwordPattern.test(password);
   }
 }

@@ -1,35 +1,26 @@
-# Stage 1: Build the application and generate Prisma client
-FROM node:18-alpine AS builder
+# Use Node.js 20.11.1 Alpine base image
+FROM node:20.11.1-alpine
 
-WORKDIR /usr/src/app
+# Set working directory
+WORKDIR /app
 
-# Copy package files first to leverage Docker layer caching
+# Copy package.json and package-lock.json
 COPY package*.json ./
-COPY prisma ./prisma/  
 
-# Install all dependencies (including dev dependencies for Prisma)
-RUN npm install
+# Install dependencies efficiently
+RUN npm ci --legacy-peer-deps
 
-# Copy the rest of the app files
+# Copy the rest of the application code
 COPY . .
 
-# Build the app and generate the Prisma client
-RUN npm run build
+# Generate Prisma Client code
 RUN npx prisma generate
 
-# Stage 2: Production image
-FROM node:18-alpine
-
-WORKDIR /usr/src/app
-
-# Copy production dependencies from the builder stage
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/package*.json ./
-COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/prisma ./prisma 
-
-# Expose the port and start the app
+# Expose the port the app runs on
 EXPOSE 4000
 
-# Optional: Run migrations before starting the app (see notes below)
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+# Set entry point
+ENTRYPOINT ["sh", "-c"]
+
+# Command to run the app
+CMD ["npm", "run", "start:migrate:prod"]
