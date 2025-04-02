@@ -6,6 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  seed     = "ts-node prisma/seed.ts"
 }
 
 datasource db {
@@ -21,4 +22,105 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   refreshToken String?
+}
+
+model Router {
+  id          String             @id @default(uuid())
+  name        String             @unique
+  type        RouterType // WAN or LAN
+  category    RouterCategory?
+  maxCapacity Int
+  status      RouterStatus? // Only for WAN routers, null for LAN
+  // WAN-LAN relationship
+  connectedTo RouterConnection[] @relation("ConnectedTo")
+  connectedBy RouterConnection[] @relation("ConnectedBy")
+  // Usage records
+  wanUsage    WanUsageRecord[]
+  lanUsage    LanUsageRecord[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+// Tracks active WAN-LAN connections
+model RouterConnection {
+  id          String   @id @default(uuid())
+  wanRouterId String
+  lanRouterId String
+  wanRouter   Router   @relation("ConnectedTo", fields: [wanRouterId], references: [id])
+  lanRouter   Router   @relation("ConnectedBy", fields: [lanRouterId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([wanRouterId, lanRouterId])
+}
+
+model WanUsageRecord {
+  id        String   @id @default(uuid())
+  routerId  String
+  router    Router   @relation(fields: [routerId], references: [id])
+  date      DateTime
+  credit    Int // Usage amount
+  debit     Int // Remaining amount
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([routerId, date])
+  @@index([date])
+}
+
+model LanUsageRecord {
+  id        String   @id @default(uuid())
+  routerId  String
+  router    Router   @relation(fields: [routerId], references: [id])
+  date      DateTime
+  credit    Int // Usage amount
+  debit     Int // Remaining amount
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([routerId, date])
+  @@index([date])
+}
+
+model CrewUsageRecord {
+  id        String     @id @default(uuid())
+  username  String
+  date      DateTime
+  credit    Int // Usage amount
+  debit     Int // Remaining amount
+  quota     Int // Monthly quota in MB
+  status    CrewStatus @default(DISCONNECTED)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([username, date])
+  @@index([date])
+}
+
+enum RouterType {
+  WAN
+  LAN
+}
+
+enum RouterCategory {
+  LEO
+  GEO
+  L_BAND
+  MOBILE
+  BUSINESS
+  CREW
+  OT
+  OTHER
+}
+
+enum RouterStatus {
+  ACTIVE
+  STANDBY
+  INACTIVE
+}
+
+enum CrewStatus {
+  CONNECTED
+  DISCONNECTED
 }

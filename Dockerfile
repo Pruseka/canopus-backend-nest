@@ -1,20 +1,49 @@
-# Use Node.js 20.11.1 Alpine base image
-FROM node:20.11.1-alpine
+# Build stage
+FROM node:20.11.1-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy package files
 COPY package*.json ./
+COPY pnpm-lock.yaml ./
 
-# Install dependencies efficiently
-RUN npm ci --legacy-peer-deps
+# Install all dependencies (including devDependencies)
+RUN pnpm install
 
-# Copy the rest of the application code
-COPY . .
+# Copy source code and config files
+COPY tsconfig*.json ./
+COPY nest-cli.json ./
+COPY src/ ./src/
+COPY prisma/ ./prisma/
 
-# Generate Prisma Client code
+# Generate Prisma Client and build the application
 RUN npx prisma generate
+RUN pnpm run build
+
+# Production stage
+FROM node:20.11.1-alpine AS production
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package*.json ./
+COPY pnpm-lock.yaml ./
+
+# Install production dependencies only
+RUN pnpm install --prod
+
+# Copy prisma schema for migrations
+COPY prisma ./prisma/
+
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Expose the port the app runs on
 EXPOSE 4000
@@ -23,4 +52,4 @@ EXPOSE 4000
 ENTRYPOINT ["sh", "-c"]
 
 # Command to run the app
-CMD ["npm", "run", "start:migrate:prod"]
+CMD ["pnpm run prisma:migrate:deploy && pnpm run start:prod"]

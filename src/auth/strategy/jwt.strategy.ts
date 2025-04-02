@@ -21,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   async validate(
     payload: JwtPayload,
-  ): Promise<Omit<UserEntity, 'password'> | null> {
+  ): Promise<Omit<UserEntity, 'password' | 'refreshToken'> | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
@@ -30,7 +30,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       return null;
     }
 
-    const { password, ...result } = user;
+    const { password, refreshToken, ...result } = user;
 
     return result;
   }

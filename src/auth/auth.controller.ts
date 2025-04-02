@@ -10,8 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { AuthDto, AuthResponseDto } from './dto';
-import { Public } from './decorators';
+import { AuthDto, AuthResponseDto, LogoutResponseDto } from './dto';
 import { Response } from 'express';
 import { GetCurrentUser } from './decorators';
 import { ConfigService } from '@nestjs/config';
@@ -19,6 +18,7 @@ import { RefreshTokenGuard } from './guard';
 import { GetCurrentUserId } from './decorators';
 import { ApiResponse } from '@nestjs/swagger';
 import { UserEntity } from 'src/user/entities';
+import { JwtAuthGuard } from './guard/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -27,7 +27,6 @@ export class AuthController {
     private configService: ConfigService,
   ) {}
 
-  @Public()
   @ApiResponse({
     status: 201,
     description: 'Sign up',
@@ -47,14 +46,13 @@ export class AuthController {
     };
   }
 
-  @Public()
   @ApiResponse({ status: 200, description: 'Sign in', type: AuthResponseDto })
   @HttpCode(HttpStatus.OK)
   @Post('signin')
   async signIn(
     @Body() dto: AuthDto,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<{ tokens: TokensResponseDto; user: UserEntity }> {
+  ): Promise<AuthResponseDto> {
     const { tokens, user } = await this.authService.signIn(dto);
 
     this.setRefreshTokenCookie(response, tokens.refreshToken);
@@ -67,7 +65,27 @@ export class AuthController {
     };
   }
 
-  @Public()
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  @ApiResponse({ status: 200, description: 'Logout', type: LogoutResponseDto })
+  @HttpCode(HttpStatus.OK)
+  async logout(
+    @GetCurrentUserId() userId: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LogoutResponseDto> {
+    await this.authService.logout(userId);
+
+    response.clearCookie('refreshToken', {
+      httpOnly: true,
+      sameSite: 'strict',
+      path: '/',
+    });
+
+    return {
+      success: true,
+    };
+  }
+
   @UseGuards(RefreshTokenGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
@@ -78,8 +96,6 @@ export class AuthController {
   ): Promise<{ accessToken: string }> {
     const tokens = await this.authService.refreshTokens(userId, refreshToken);
 
-    console.log('refreshTokens controller called');
-
     this.setRefreshTokenCookie(response, tokens.refreshToken);
 
     return {
@@ -87,6 +103,7 @@ export class AuthController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
   getProfile(@GetCurrentUser() user: UserEntity) {
     return user;
@@ -98,7 +115,7 @@ export class AuthController {
   ): void {
     response.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: this.configService.get('NODE_ENV') === 'production',
+      // secure: this.configService.get('NODE_ENV') === 'production',
       sameSite: 'strict',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days

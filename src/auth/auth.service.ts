@@ -59,13 +59,19 @@ export class AuthService {
       },
     });
 
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user) throw new ForbiddenException('Invalid credentials');
 
     const pwMatches = await argon.verify(user.password, dto.password);
 
-    if (!pwMatches) throw new UnauthorizedException('Incorrect Password');
+    if (!pwMatches) throw new ForbiddenException('Incorrect Password');
 
     return this.signToken(user);
+  }
+
+  async logout(userId: string): Promise<boolean> {
+    await this.user.updateRefreshToken(userId, null);
+
+    return true;
   }
 
   async signToken(user: UserEntity): Promise<{
@@ -86,16 +92,16 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     if (!user || !user.refreshToken) {
-      throw new ForbiddenException('Access Denied');
+      throw new ForbiddenException('Access Denied. No refresh token found');
     }
 
     const isRefreshTokenValid = await argon.verify(
-      refreshToken,
       user.refreshToken,
+      refreshToken,
     );
 
     if (!isRefreshTokenValid) {
-      throw new ForbiddenException('Access Denied');
+      throw new ForbiddenException('Access Denied, Invalid refresh token');
     }
 
     const tokens = await this.getTokens(user.id, user.email);
@@ -117,7 +123,7 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwt.signAsync(jwtPayload, {
         secret: this.config.get('JWT_SECRET'),
-        expiresIn: this.config.get('JWT_EXPIRATION_TIME') || '30m',
+        expiresIn: this.config.get('JWT_EXPIRATION_TIME') || '1m',
       }),
 
       this.jwt.signAsync(jwtPayload, {

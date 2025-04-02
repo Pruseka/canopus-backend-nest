@@ -20,22 +20,17 @@ services:
   canopus-api:
     build:
       context: .
-      target: builder
+      target: production
     restart: always
     depends_on:
       canopus-dev-db:
         condition: service_healthy
     ports:
       - '4000:4000'
-    env_file:
-      - .env
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       DATABASE_URL: 'postgresql://postgres:password@canopus-dev-db:5432/canopus?schema=public'
-    volumes:
-      - ./:/app
-      - /app/node_modules
-    command: sh -c "cd /app && pnpm run prisma:generate && pnpm run prisma:migrate:deploy && pnpm run start:dev"
+    command: sh -c "pnpm run prisma:migrate:deploy && pnpm run start:prod"
 
 volumes:
   pgdata:
