@@ -13,8 +13,8 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('NestJS API')
-    .setDescription('API for NestJS')
+    .setTitle('Canopus API')
+    .setDescription('API for Canopus')
     .setVersion('1.0')
     .build();
 

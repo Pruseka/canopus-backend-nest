@@ -1,8 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Pending, User, UserAccessLevel } from '@prisma/client';
-import { Exclude } from 'class-transformer';
+import { Pending, UserAccessLevel, UserHistorySnapshot } from '@prisma/client';
 
-export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
+export class UserHistorySnapshotEntity
+  implements Omit<UserHistorySnapshot, 'timeCredit' | 'dataCredit'>
+{
   constructor(partial: Partial<any>) {
     Object.assign(this, partial);
 
@@ -27,24 +28,16 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
   }
 
   @ApiProperty({
-    description: 'Unique user identifier',
+    description: 'Unique snapshot identifier',
     example: 'clj5abcde12345',
   })
   id: string;
 
   @ApiProperty({
-    description: 'User email address',
-    example: 'user@example.com',
+    description: 'User ID this snapshot belongs to',
+    example: 'clj5abcde12345',
   })
-  email: string;
-
-  @ApiProperty({
-    required: false,
-    nullable: true,
-    description: 'Full name of the user',
-    example: 'John Doe',
-  })
-  name: string | null;
+  userId: string;
 
   @ApiProperty({
     description: 'When the user was created',
@@ -59,15 +52,26 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
   updatedAt: Date;
 
   @ApiProperty({
+    description: 'Date of the snapshot',
+    example: '2023-05-15T00:00:00Z',
+  })
+  snapshotDate: Date;
+
+  @ApiProperty({
     required: false,
     nullable: true,
-    description: 'Refresh token for JWT authentication',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description: 'Full name of the user',
+    example: 'John Doe',
   })
-  refreshToken: string | null;
+  name: string | null;
 
-  @Exclude()
-  password: string;
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description: 'Display name shown in UI',
+    example: 'Johnny',
+  })
+  displayName: string | null;
 
   @ApiProperty({
     enum: UserAccessLevel,
@@ -89,14 +93,6 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
   dataCredit: number;
 
   @ApiProperty({
-    required: false,
-    nullable: true,
-    description: 'Display name shown in UI',
-    example: 'Johnny',
-  })
-  displayName: string | null;
-
-  @ApiProperty({
     enum: Pending,
     description: 'User status',
     example: Pending.REGISTERED,
@@ -104,10 +100,9 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
   pending: Pending;
 
   @ApiProperty({
-    description:
-      'When the user last connected to the portal. Null means user not connected to captive portal',
+    description: 'When the user last connected to the portal',
     example: '2023-05-15T10:30:00Z',
-    default: null,
+    nullable: true,
   })
   portalConnectedAt: Date | null;
 

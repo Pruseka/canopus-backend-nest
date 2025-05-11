@@ -30,7 +30,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       return null;
     }
 
-    const { password, ...result } = user;
+    const userEntity = new UserEntity(user);
+
+    const { password, ...result } = userEntity;
 
     return result;
   }

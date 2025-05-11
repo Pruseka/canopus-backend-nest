@@ -10,6 +10,7 @@ import {
   of,
   startWith,
   switchMap,
+  takeWhile,
   timeout,
 } from 'rxjs';
 import { AxiosError, AxiosRequestConfig } from 'axios';
@@ -18,6 +19,8 @@ import { AxiosError, AxiosRequestConfig } from 'axios';
 export class SnakeWaysBaseService {
   protected readonly logger = new Logger(SnakeWaysBaseService.name);
   private serviceAvailable = true;
+  private consecutiveFailures = 0;
+  private readonly maxConsecutiveFailures = 10;
 
   constructor(protected readonly httpService: HttpService) {
     // Check service availability on startup
@@ -35,8 +38,9 @@ export class SnakeWaysBaseService {
           catchError((error) => {
             if (error.code === 'ECONNREFUSED') {
               this.serviceAvailable = false;
+              this.consecutiveFailures++;
               this.logger.warn(
-                `Snake Ways service connection refused at ${error.config?.baseURL || 'the configured URL'}. Some features may be limited.`,
+                `Snake Ways service connection refused at ${error.config?.baseURL || 'the configured URL'}. Some features may be limited. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
               );
             } else if (
               error.code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
@@ -47,10 +51,12 @@ export class SnakeWaysBaseService {
                 'SSL certificate validation issue, but continuing anyway due to httpsAgent configuration.',
               );
               this.serviceAvailable = true; // We're still considering the service available
+              this.resetConsecutiveFailures();
             } else {
               this.serviceAvailable = false;
+              this.consecutiveFailures++;
               this.logger.warn(
-                `Snake Ways service is not available. Error: ${error.message}. Some features may be limited.`,
+                `Snake Ways service is not available. Error: ${error.message}. Some features may be limited. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
               );
             }
             return of({ data: null });
@@ -59,10 +65,30 @@ export class SnakeWaysBaseService {
       );
     } catch (error) {
       this.serviceAvailable = false;
+      this.consecutiveFailures++;
       this.logger.warn(
-        `Snake Ways service is not available. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Some features may be limited.`,
+        `Snake Ways service is not available. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Some features may be limited. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
       );
     }
+  }
+
+  /**
+   * Reset the consecutive failures counter when service becomes available
+   */
+  protected resetConsecutiveFailures() {
+    if (this.consecutiveFailures > 0) {
+      this.logger.log(
+        `Resetting consecutive failures counter from ${this.consecutiveFailures} to 0`,
+      );
+      this.consecutiveFailures = 0;
+    }
+  }
+
+  /**
+   * Check if we should stop polling due to too many consecutive failures
+   */
+  protected shouldStopPolling(): boolean {
+    return this.consecutiveFailures >= this.maxConsecutiveFailures;
   }
 
   /**
@@ -73,7 +99,9 @@ export class SnakeWaysBaseService {
     config?: AxiosRequestConfig,
   ): Promise<T | null> {
     if (!this.serviceAvailable) {
-      this.logger.warn(`GET ${endpoint} skipped: Service unavailable`);
+      this.logger.warn(
+        `GET ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
+      );
       return null;
     }
 
@@ -87,6 +115,9 @@ export class SnakeWaysBaseService {
           }),
         ),
       );
+
+      // If we get here, the request succeeded
+      this.resetConsecutiveFailures();
       return data;
     } catch (error) {
       this.logger.error(`Failed GET request to ${endpoint}`);
@@ -196,16 +227,45 @@ export class SnakeWaysBaseService {
 
     return interval(intervalMs).pipe(
       startWith(0), // Emit immediately on subscription
+      takeWhile(() => !this.shouldStopPolling()), // Stop if too many failures
       switchMap(() => {
         if (!this.serviceAvailable) {
-          this.logger.warn(`Polling ${endpoint} skipped: Service unavailable`);
+          this.consecutiveFailures++;
+          this.logger.warn(
+            `Polling ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
+          );
+
+          // Check if we've reached max failures
+          if (this.shouldStopPolling()) {
+            this.logger.error(
+              `Stopping polling for ${endpoint} after ${this.maxConsecutiveFailures} consecutive failures`,
+            );
+          }
+
           return of(null);
         }
 
         return this.httpService.get<T>(endpoint).pipe(
-          map((response) => response.data),
+          map((response) => {
+            // Reset failure counter on success
+            this.resetConsecutiveFailures();
+            return response.data;
+          }),
           catchError((error) => {
             this.handleError('GET', endpoint, error);
+            this.consecutiveFailures++;
+
+            this.logger.warn(
+              `Failed to poll ${endpoint}. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
+            );
+
+            // Check if we've reached max failures
+            if (this.shouldStopPolling()) {
+              this.logger.error(
+                `Stopping polling for ${endpoint} after ${this.maxConsecutiveFailures} consecutive failures`,
+              );
+            }
+
             // Return null to prevent the stream from terminating
             return of(null);
           }),
@@ -224,8 +284,9 @@ export class SnakeWaysBaseService {
   ): void {
     if (error.code === 'ECONNREFUSED') {
       this.serviceAvailable = false;
+      this.consecutiveFailures++;
       this.logger.warn(
-        `Snake Ways service is not available at ${error.config?.baseURL || 'the configured URL'}`,
+        `Snake Ways service is not available at ${error.config?.baseURL || 'the configured URL'}. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
       );
       return;
     }
@@ -239,6 +300,7 @@ export class SnakeWaysBaseService {
       this.logger.warn(
         `SSL certificate validation issue for ${method} ${endpoint}, but continuing due to httpsAgent configuration.`,
       );
+      this.resetConsecutiveFailures(); // Reset counter for SSL issues we're ignoring
       return;
     }
 
@@ -247,12 +309,18 @@ export class SnakeWaysBaseService {
       this.logger.error(
         `${method} ${endpoint} failed with status ${error.response.status}: ${JSON.stringify(error.response.data)}`,
       );
+      // Don't increment failures for HTTP responses (even errors) as the service is technically available
+      this.resetConsecutiveFailures();
     } else if (error.request) {
       // The request was made but no response was received
-      this.logger.error(`${method} ${endpoint} failed: No response received`);
+      this.logger.error(
+        `${method} ${endpoint} failed: No response received from server`,
+      );
+      this.consecutiveFailures++;
     } else {
-      // Something happened while setting up the request
+      // Something happened in setting up the request that triggered an Error
       this.logger.error(`${method} ${endpoint} failed: ${error.message}`);
+      this.consecutiveFailures++;
     }
   }
 }

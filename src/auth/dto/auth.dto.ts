@@ -11,7 +11,7 @@ export class AuthDto {
   @IsNotEmpty()
   @IsString()
   @Length(3, 20)
-  name: string;
+  username: string;
 
   @IsEmail()
   @IsNotEmpty()

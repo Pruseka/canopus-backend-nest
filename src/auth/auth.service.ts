@@ -15,7 +15,7 @@ import { UserService } from 'src/user/user.service';
 import { SignupErrorException } from './exceptions/sign-up-error.exception';
 import { UserEntity } from 'src/user/entities/';
 import { plainToInstance } from 'class-transformer';
-
+import { Pending, User, UserAccessLevel } from '@prisma/client';
 @Injectable()
 export class AuthService {
   constructor(
@@ -41,15 +41,30 @@ export class AuthService {
 
     const hash = await argon.hash(dto.password);
 
-    const user = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email,
-        password: hash,
-      },
-    });
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          name: dto.name,
+          email: dto.email,
+          password: hash,
+          accessLevel: UserAccessLevel.USER,
+          autoCredit: false,
+          dataCredit: BigInt(0),
+          pending: Pending.PENDING,
+          portalConnectedAt: null,
+          timeCredit: BigInt(0),
+          displayName: dto.name,
+        },
+      });
 
-    return this.signToken(user);
+      return this.signToken(user);
+    } catch (error) {
+      console.error('Error during sign up:', error);
+      throw new SignupErrorException(
+        'password_criteria',
+        'Error creating user. Please try again.',
+      );
+    }
   }
 
   async signIn(dto: AuthDto) {
@@ -68,7 +83,7 @@ export class AuthService {
     return this.signToken(user);
   }
 
-  async signToken(user: UserEntity): Promise<{
+  async signToken(user: User): Promise<{
     tokens: TokensResponseDto;
     user: UserEntity;
   }> {
@@ -76,7 +91,10 @@ export class AuthService {
 
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
 
-    return { tokens, user };
+    // Create a UserEntity instance to properly handle BigInt conversion
+    const userEntity = new UserEntity(user);
+
+    return { tokens, user: userEntity };
   }
 
   async refreshTokens(
