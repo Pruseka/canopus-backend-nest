@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { AuthDto } from './dto';
+import { SignUpDto, SignInDto, SignInErrorDto, AuthResponseDto } from './dto';
 import * as argon from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +16,8 @@ import { SignupErrorException } from './exceptions/sign-up-error.exception';
 import { UserEntity } from 'src/user/entities/';
 import { plainToInstance } from 'class-transformer';
 import { Pending, User, UserAccessLevel } from '@prisma/client';
+import { Validator } from '../common/utils/validator';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -24,27 +26,49 @@ export class AuthService {
     private config: ConfigService,
     private user: UserService,
   ) {}
-  async signUp(
-    dto: AuthDto,
-  ): Promise<{ tokens: TokensResponseDto; user: UserEntity }> {
-    const existingUser = await this.prisma.user.findUnique({
-      where: {
-        email: dto.email,
-      },
-    });
 
-    if (existingUser)
-      throw new UnauthorizedException(
-        'credentials_taken',
-        'The user with this email already exists',
+  async signUp(dto: SignUpDto): Promise<AuthResponseDto> {
+    try {
+      const validation = await Validator.validateDTOWithoutThrowing(
+        SignUpDto,
+        dto,
       );
 
-    const hash = await argon.hash(dto.password);
+      if (!validation.isValid || !validation.value) {
+        return {
+          tokens: null,
+          user: null,
+          error: {
+            field: validation.errors?.[0]?.field || 'unknown',
+            message: validation.errors?.[0]?.message || 'Validation failed',
+          },
+        };
+      }
 
-    try {
+      const validatedDto = validation.value;
+
+      const existingUser = await this.prisma.user.findUnique({
+        where: {
+          email: validatedDto.email,
+        },
+      });
+
+      if (existingUser) {
+        return {
+          tokens: null,
+          user: null,
+          error: {
+            field: 'email',
+            message: 'The user with this email already exists',
+          },
+        };
+      }
+
+      const hash = await argon.hash(dto.password);
+
       const user = await this.prisma.user.create({
         data: {
-          name: dto.name,
+          name: dto.username,
           email: dto.email,
           password: hash,
           accessLevel: UserAccessLevel.USER,
@@ -53,34 +77,93 @@ export class AuthService {
           pending: Pending.PENDING,
           portalConnectedAt: null,
           timeCredit: BigInt(0),
-          displayName: dto.name,
+          displayName: dto.username,
         },
       });
 
-      return this.signToken(user);
+      const { tokens, user: userEntity } = await this.signToken(user);
+
+      return { tokens, user: userEntity, error: null };
     } catch (error) {
-      console.error('Error during sign up:', error);
-      throw new SignupErrorException(
-        'password_criteria',
-        'Error creating user. Please try again.',
-      );
+      if (error instanceof PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          return {
+            tokens: null,
+            user: null,
+            error: {
+              field: 'email',
+              message: 'The user with this email already exists',
+            },
+          };
+        }
+      }
+
+      return {
+        tokens: null,
+        user: null,
+        error: {
+          field: 'password',
+          message: 'Error creating user. Please try again.',
+        },
+      };
     }
   }
 
-  async signIn(dto: AuthDto) {
+  async signIn(dto: SignInDto): Promise<{
+    tokens: TokensResponseDto | null;
+    user: UserEntity | null;
+    error: SignInErrorDto | null;
+  }> {
+    const validation = await Validator.validateDTOWithoutThrowing(
+      SignInDto,
+      dto,
+    );
+
+    if (!validation.isValid || !validation.value) {
+      return {
+        tokens: null,
+        user: null,
+        error: {
+          field: validation.errors?.[0]?.field || 'unknown',
+          message: validation.errors?.[0]?.message || 'Validation failed',
+        },
+      };
+    }
+
+    const validatedDto = validation.value;
+
     const user = await this.prisma.user.findUnique({
       where: {
-        email: dto.email,
+        email: validatedDto.email,
       },
     });
 
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user) {
+      return {
+        tokens: null,
+        user: null,
+        error: {
+          field: 'email',
+          message: 'User not found with this email',
+        },
+      };
+    }
+    const pwMatches = await argon.verify(user.password, validatedDto.password);
 
-    const pwMatches = await argon.verify(user.password, dto.password);
+    if (!pwMatches) {
+      return {
+        tokens: null,
+        user: null,
+        error: {
+          field: 'password',
+          message: 'Incorrect Password',
+        },
+      };
+    }
 
-    if (!pwMatches) throw new UnauthorizedException('Incorrect Password');
+    const { tokens, user: userEntity } = await this.signToken(user);
 
-    return this.signToken(user);
+    return { tokens, user: userEntity, error: null };
   }
 
   async signToken(user: User): Promise<{
@@ -108,8 +191,8 @@ export class AuthService {
     }
 
     const isRefreshTokenValid = await argon.verify(
-      refreshToken,
       user.refreshToken,
+      refreshToken,
     );
 
     if (!isRefreshTokenValid) {

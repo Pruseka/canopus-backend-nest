@@ -122,7 +122,11 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
       //   orderBy: { snapshotDate: 'desc' },
       // });
 
-      const snapshots = sampleUserHistory as any[];
+      const snapshots = sampleUserHistory.filter((snapshot) => {
+        return (
+          snapshot.snapshotDate >= startDate && snapshot.snapshotDate <= endDate
+        );
+      }) as any[];
 
       return snapshots;
     } catch (error) {

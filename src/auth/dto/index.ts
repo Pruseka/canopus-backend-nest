@@ -1,2 +1,2 @@
 export * from './auth.dto';
-export * from './signup-response.dto';
+export * from './auth-response.dto';

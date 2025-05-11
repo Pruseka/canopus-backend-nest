@@ -89,7 +89,7 @@ export class UserController {
     return req.user;
   }
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Get('history')
   @ApiResponse({
     status: 200,

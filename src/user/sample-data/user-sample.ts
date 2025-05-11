@@ -98,7 +98,7 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     id: 'clk1a2b3c4d5e6f7g8',
     userId: 'clj5o5p6q7r8s9t0u1', // Regular user ID
     snapshotDate: new Date('2023-05-25T00:00:00Z'),
-    name: 'Regular User',
+    name: 'Regular User 1',
     displayName: 'User',
     accessLevel: UserAccessLevel.USER,
     autoCredit: false,
@@ -113,7 +113,7 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     id: 'clk8h9i0j1k2l3m4n5',
     userId: 'clj5o5p6q7r8s9t0u1', // Regular user ID
     snapshotDate: new Date('2023-05-28T00:00:00Z'),
-    name: 'Regular User',
+    name: 'Regular User 2',
     displayName: 'User',
     accessLevel: UserAccessLevel.USER,
     autoCredit: false,
@@ -128,7 +128,7 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     id: 'clk3o4p5q6r7s8t9u0',
     userId: 'clj5o5p6q7r8s9t0u1', // Regular user ID
     snapshotDate: new Date('2023-06-01T00:00:00Z'),
-    name: 'Regular User',
+    name: 'Regular User 3',
     displayName: 'User',
     accessLevel: UserAccessLevel.USER,
     autoCredit: false,

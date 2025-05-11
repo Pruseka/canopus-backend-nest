@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { AuthDto, AuthResponseDto } from './dto';
+import { AuthResponseDto, SignInDto, SignInErrorDto, SignUpDto } from './dto';
 import { Public } from './decorators';
 import { Response } from 'express';
 import { GetCurrentUser } from './decorators';
@@ -34,16 +34,23 @@ export class AuthController {
     type: AuthResponseDto,
   })
   @Post('signup')
-  async signUp(
-    @Body() dto: AuthDto,
-  ): Promise<{ tokens: TokensResponseDto; user: UserEntity }> {
-    const { tokens, user } = await this.authService.signUp(dto);
+  async signUp(@Body() dto: SignUpDto): Promise<AuthResponseDto> {
+    const { tokens, user, error } = await this.authService.signUp(dto);
+
+    if (error || !tokens || !user) {
+      return {
+        tokens,
+        user,
+        error,
+      };
+    }
 
     const userWithoutPassword = new UserEntity(user);
 
     return {
       tokens,
       user: userWithoutPassword,
+      error,
     };
   }
 
@@ -52,10 +59,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('signin')
   async signIn(
-    @Body() dto: AuthDto,
+    @Body() dto: SignInDto,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<{ tokens: TokensResponseDto; user: UserEntity }> {
-    const { tokens, user } = await this.authService.signIn(dto);
+  ): Promise<AuthResponseDto> {
+    const { tokens, user, error } = await this.authService.signIn(dto);
+
+    if (error || !tokens || !user) {
+      return {
+        tokens,
+        user,
+        error,
+      };
+    }
 
     this.setRefreshTokenCookie(response, tokens.refreshToken);
 
@@ -64,6 +79,7 @@ export class AuthController {
     return {
       tokens,
       user: userWithoutPassword,
+      error,
     };
   }
 
@@ -77,8 +93,6 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<{ accessToken: string }> {
     const tokens = await this.authService.refreshTokens(userId, refreshToken);
-
-    console.log('refreshTokens controller called');
 
     this.setRefreshTokenCookie(response, tokens.refreshToken);
 

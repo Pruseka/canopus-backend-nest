@@ -3,8 +3,8 @@ import { Request } from 'express';
 import { UserEntity } from 'src/user/entities';
 
 export const GetCurrentUserId = createParamDecorator(
-  (data: unknown, context: ExecutionContext): UserEntity['id'] | undefined => {
+  (data: unknown, context: ExecutionContext): string => {
     const request: Request = context.switchToHttp().getRequest();
-    return (request.user as any).id;
+    return request.user && request.user['sub'];
   },
 );
