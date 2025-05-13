@@ -15,6 +15,11 @@ export class CustomValidationPipe implements PipeTransform {
       return value;
     }
 
+    // Check if value is null or undefined before attempting to transform
+    if (value === null || value === undefined) {
+      return value;
+    }
+
     const object = plainToInstance(metatype, value);
     const errors = await validate(object);
 

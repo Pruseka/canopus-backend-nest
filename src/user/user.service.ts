@@ -1,16 +1,13 @@
 import {
   Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
   Logger,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SnakeWaysUserService } from 'src/snake-ways/user/snake-ways-user.service';
 import { UserEntity } from './entities/user.entity';
-
-import { UserHistorySnapshot } from '@prisma/client';
-import { startOfDay, subWeeks } from 'date-fns';
-import { sampleUserHistory } from './sample-data/user-sample';
+import { UserHistorySnapshotEntity } from './entities/user-history-snapshot.entity';
 const chalk = require('chalk');
 
 @Injectable()
@@ -52,7 +49,7 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
       return dbUsers.map((user) => new UserEntity(user));
     } catch (error) {
       this.logger.error(chalk.red('Error fetching users from database'), error);
-      return [];
+      throw error;
     }
   }
 
@@ -108,28 +105,32 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
    * @param endDate Optional end date to filter snapshots, defaults to one week ago
    * @returns Array of UserHistorySnapshot objects
    */
-  getHistory(
-    startDate: Date = startOfDay(new Date()),
-    endDate: Date = subWeeks(startOfDay(new Date()), 1),
-  ): UserHistorySnapshot[] | null {
+  async getHistory(
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<UserHistorySnapshotEntity[] | null> {
     try {
-      // const snapshots = await this.prisma.userHistorySnapshot.findMany({
-      //   where: {
-      //     snapshotDate: {
-      //       gte: startDate,
-      //       lte: endDate,
-      //     },
-      //   },
-      //   orderBy: { snapshotDate: 'desc' },
-      // });
+      const dbSnapshots = await this.prisma.userHistorySnapshot.findMany({
+        where: {
+          ...(startDate && endDate
+            ? {
+                snapshotDate: {
+                  gte: startDate,
+                  lte: endDate,
+                },
+              }
+            : {}),
+        },
+        orderBy: { snapshotDate: 'desc' },
+      });
 
-      const snapshots = sampleUserHistory.filter((snapshot) => {
-        return (
-          snapshot.snapshotDate >= startDate && snapshot.snapshotDate <= endDate
-        );
-      }) as any[];
+      this.logger.log(
+        chalk.green('Fetched user history snapshots from database'),
+      );
 
-      return snapshots;
+      return dbSnapshots.map(
+        (snapshot) => new UserHistorySnapshotEntity(snapshot),
+      );
     } catch (error) {
       this.logger.error(
         chalk.red('Error fetching user history from database'),
@@ -148,28 +149,34 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
    */
   async getUserHistory(
     userId: string,
-    startDate: Date = startOfDay(new Date()),
-    endDate: Date = subWeeks(startOfDay(new Date()), 1),
-  ): Promise<UserHistorySnapshot[] | null> {
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<UserHistorySnapshotEntity[] | null> {
     try {
-      const snapshots = await this.prisma.userHistorySnapshot.findMany({
+      const dbSnapshots = await this.prisma.userHistorySnapshot.findMany({
         where: {
           userId,
-          snapshotDate: {
-            gte: startDate,
-            lte: endDate,
-          },
+          ...(startDate && endDate
+            ? {
+                snapshotDate: {
+                  gte: startDate,
+                  lte: endDate,
+                },
+              }
+            : {}),
         },
         orderBy: { snapshotDate: 'desc' },
       });
 
-      return snapshots;
+      return dbSnapshots.map(
+        (snapshot) => new UserHistorySnapshotEntity(snapshot),
+      );
     } catch (error) {
       this.logger.error(
         chalk.red('Error fetching user history from database'),
         error,
       );
-      return null;
+      throw error;
     }
   }
 

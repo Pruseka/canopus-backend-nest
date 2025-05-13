@@ -13,6 +13,16 @@ export class Validator {
     dto: new () => T,
     object: object,
   ): Promise<T> {
+    // Check if object is null or undefined
+    if (object === null || object === undefined) {
+      throw new ValidationException([
+        {
+          property: 'object',
+          constraints: { isNotEmpty: 'Object cannot be empty' },
+        } as ValidationError,
+      ]);
+    }
+
     const instance = plainToInstance(dto, object);
     const errors = await validate(instance);
 
@@ -37,6 +47,15 @@ export class Validator {
     errors: { field: string; message: string }[] | null;
     value: T | null;
   }> {
+    // Check if object is null or undefined
+    if (object === null || object === undefined) {
+      return {
+        isValid: false,
+        errors: [{ field: 'object', message: 'Object cannot be empty' }],
+        value: null,
+      };
+    }
+
     const instance = plainToInstance(dto, object);
     const errors = await validate(instance);
 

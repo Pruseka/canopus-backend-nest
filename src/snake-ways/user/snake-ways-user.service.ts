@@ -186,7 +186,7 @@ export class SnakeWaysUserService
    * Initialize polling when module starts
    */
   async onModuleInit() {
-    this.startPollingUsers();
+    // this.startPollingUsers();
   }
 
   /**
@@ -433,7 +433,7 @@ export class SnakeWaysUserService
       return response?.user || [];
     } catch (error) {
       this.logger.error(chalk.red('Failed to get users'), error);
-      throw error;
+      throw new Error(`Failed to get users: ${error.message}`);
     }
   }
 

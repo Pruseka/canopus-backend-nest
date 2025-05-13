@@ -41,11 +41,10 @@ export class WanService implements OnModuleInit, OnModuleDestroy {
         return [];
       }
 
-      // Transform to UserEntity objects
       return dbWans.map((wan) => new WanEntity(wan));
     } catch (error) {
       this.logger.error(chalk.red('Error fetching wans from database'), error);
-      return [];
+      throw error;
     }
   }
 

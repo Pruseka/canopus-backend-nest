@@ -131,12 +131,12 @@ export class SnakeWaysBaseService {
     config?: AxiosRequestConfig,
   ): Promise<T | null> {
     // For one-time requests, still check serviceAvailable to avoid unnecessary network calls
-    // if (!this.serviceAvailable) {
-    //   this.logger.warn(
-    //     `GET ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
-    //   );
-    //   return null;
-    // }
+    if (!this.serviceAvailable) {
+      this.logger.warn(
+        `GET ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
+      );
+      return null;
+    }
 
     try {
       const { data } = await firstValueFrom(

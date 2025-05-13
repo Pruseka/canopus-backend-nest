@@ -325,7 +325,7 @@ export class SnakeWaysWanService
   }
 
   async onModuleInit() {
-    this.startPollingWans();
+    // this.startPollingWans();
   }
 
   private startPollingWans() {
@@ -572,7 +572,7 @@ export class SnakeWaysWanService
       return wans || [];
     } catch (error) {
       this.logger.error('Failed to get WAN connections', error);
-      return [];
+      throw new Error(`Failed to get WAN connections: ${error.message}`);
     }
   }
 
