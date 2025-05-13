@@ -1,4 +1,4 @@
-import { PrismaClient, UserAccessLevel, Pending } from '@prisma/client';
+import { PrismaClient, UserAccessLevel, Status } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
@@ -27,7 +27,7 @@ async function main() {
       autoCredit: true,
       dataCredit: BigInt(5368709120), // 5GB
       timeCredit: BigInt(86400 * 7), // 7 days in seconds
-      pending: Pending.REGISTERED,
+      status: Status.REGISTERED,
       portalConnectedAt: new Date(),
     },
   });
@@ -45,7 +45,7 @@ async function main() {
       autoCredit: true,
       dataCredit: BigInt(3221225472), // 3GB
       timeCredit: BigInt(86400 * 5), // 5 days in seconds
-      pending: Pending.REGISTERED,
+      status: Status.REGISTERED,
       portalConnectedAt: new Date(Date.now() - 3600000), // 1 hour ago
     },
   });
@@ -63,7 +63,7 @@ async function main() {
       autoCredit: false,
       dataCredit: BigInt(1073741824), // 1GB
       timeCredit: BigInt(3600 * 24), // 24 hours in seconds
-      pending: Pending.REGISTERED,
+      status: Status.REGISTERED,
       portalConnectedAt: new Date(Date.now() - 86400000), // 1 day ago
     },
   });
@@ -81,7 +81,7 @@ async function main() {
       autoCredit: false,
       dataCredit: BigInt(536870912), // 512MB
       timeCredit: BigInt(3600 * 12), // 12 hours in seconds
-      pending: Pending.REGISTERED,
+      status: Status.REGISTERED,
       portalConnectedAt: null, // Not connected yet
     },
   });
@@ -99,7 +99,7 @@ async function main() {
       autoCredit: false,
       dataCredit: BigInt(0),
       timeCredit: BigInt(0),
-      pending: Pending.PENDING,
+      status: Status.PENDING,
       portalConnectedAt: null,
     },
   });
@@ -119,7 +119,7 @@ async function main() {
       autoCredit: regularUser.autoCredit,
       dataCredit: BigInt(2147483648), // 2GB (different from current)
       timeCredit: BigInt(3600 * 48), // 48 hours (different from current)
-      pending: regularUser.pending,
+      status: Status.PENDING,
       portalConnectedAt: new Date(snapshotDate1.getTime() - 3600000), // 1 hour before snapshot
     },
   });
@@ -137,7 +137,7 @@ async function main() {
       autoCredit: regularUser.autoCredit,
       dataCredit: BigInt(1610612736), // 1.5GB
       timeCredit: BigInt(3600 * 36), // 36 hours
-      pending: regularUser.pending,
+      status: Status.PENDING,
       portalConnectedAt: new Date(snapshotDate2.getTime() - 7200000), // 2 hours before snapshot
     },
   });

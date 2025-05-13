@@ -1,9 +1,23 @@
+import { OnModuleDestroy } from '@nestjs/common';
 // src/external-service/external-user.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { SnakeWaysBaseService } from '../snake-ways-base.service';
 import { ApiProperty } from '@nestjs/swagger';
-
+import { PrismaService } from 'src/prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
+import chalk from 'chalk';
+import { Subscription } from 'rxjs';
+import { Observable } from 'rxjs';
+import {
+  Wan as PrismaWan,
+  PrepaidUsageMode as PrismaPrepaidUsageMode,
+  DhcpStatus as PrismaDhcpStatus,
+  WanStatus as PrismaWanStatus,
+  UsagePeriodType as PrismaUsagePeriodType,
+  UsageLimitStatus as PrismaUsageLimitStatus,
+} from '@prisma/client';
+import { WanEntity } from 'src/wan/entities/wan.entity';
 /**
  * Enum for prepaid usage settings
  */
@@ -286,13 +300,267 @@ export class Wan {
 }
 
 @Injectable()
-export class SnakeWaysWanService extends SnakeWaysBaseService {
-  constructor(protected readonly httpService: HttpService) {
+export class SnakeWaysWanService
+  extends SnakeWaysBaseService
+  implements OnModuleInit, OnModuleDestroy
+{
+  private wanPollingSubscription: Subscription;
+  private wanDataStream$: Observable<{ wan: Wan[] } | null>;
+  private pollingActive = false;
+  private pollingIntervalInMins: number;
+
+  constructor(
+    protected readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+    private readonly prismaService: PrismaService,
+  ) {
     super(httpService);
     // Override logger with this class name
     Object.defineProperty(this, 'logger', {
       value: new Logger(SnakeWaysWanService.name),
     });
+
+    this.pollingIntervalInMins =
+      this.configService.get<number>('SNAKE_WAYS_WAN_POLLING_INTERVAL') || 100;
+  }
+
+  async onModuleInit() {
+    this.startPollingWans();
+  }
+
+  private startPollingWans() {
+    if (this.pollingActive) {
+      this.logger.log(
+        chalk.yellow('Wan Polling is already active, not starting again'),
+      );
+      return;
+    }
+
+    this.pollingActive = true;
+
+    this.logger.log(
+      chalk.blue.bold(
+        `Starting to poll WANs from Snake Ways every ${this.pollingIntervalInMins} minutes`,
+      ),
+    );
+
+    this.wanDataStream$ = this.createPollingObservable<{ wan: Wan[] }>(
+      '/wan',
+      this.pollingIntervalInMins * 1000, // Convert minutes to milliseconds
+    );
+
+    this.wanPollingSubscription = this.wanDataStream$.subscribe({
+      next: async (data) => {
+        if (data?.wan) {
+          await this.syncWansWithDatabase(data.wan);
+        }
+      },
+      error: (error) => {
+        // This should rarely be called since we're catching errors in the observable
+        this.logger.error(
+          chalk.red.bold('Unexpected error in WAN polling subscription'),
+          error,
+        );
+        // Don't set pollingActive to false here to allow retries
+        // Instead, log that we'll try to recover
+        this.logger.warn(
+          chalk.yellow.bold('Attempting to recover from polling error'),
+        );
+      },
+      complete: () => {
+        this.logger.warn(
+          chalk.yellow.bold(
+            'Polling wans from Snake Ways completed or stopped due to max failures',
+          ),
+        );
+        this.pollingActive = false;
+      },
+    });
+  }
+
+  public async restartPollingIfStopped(): Promise<boolean> {
+    if (!this.pollingActive) {
+      this.logger.log(chalk.blue.bold('Attempting to restart wan polling'));
+      // Reset the service availability status
+      this.resetServiceAvailability();
+      // Reset the consecutive failures counter for this endpoint
+      this.resetConsecutiveFailures('/wan');
+      // Start polling again
+      this.startPollingWans();
+      return true;
+    }
+    return false;
+  }
+
+  private async syncWansWithDatabase(snakeWaysWans: Wan[]) {
+    try {
+      this.logger.log(
+        chalk.cyan(
+          `Syncing ${chalk.bold(snakeWaysWans.length)} WANs from Snake Ways`,
+        ),
+      );
+
+      for (const swWan of snakeWaysWans) {
+        const upsertData = this.transformToPrismaWan(swWan);
+
+        const wan = await this.prismaService.wan.upsert(upsertData);
+
+        this.logger.log(
+          chalk.green(`Synced Prisma Wan: ${wan.wanName} (${wan.id})`),
+        );
+      }
+      this.logger.log(chalk.green.bold(`Wan sync completed successfully`));
+    } catch (error) {
+      this.logger.error('Failed to sync WANs with database', error);
+    }
+  }
+
+  private transformToPrismaWan(swWan: Wan) {
+    const mapPrepaidUsageMode = (
+      mode: PrepaidUsageMode,
+    ): PrismaPrepaidUsageMode => {
+      switch (mode) {
+        case PrepaidUsageMode.DISALLOW:
+          return PrismaPrepaidUsageMode.DISALLOW;
+        case PrepaidUsageMode.ALLOW:
+          return PrismaPrepaidUsageMode.ALLOW;
+        case PrepaidUsageMode.LIMITED:
+          return PrismaPrepaidUsageMode.LIMITED;
+        default:
+          throw new Error(`Unknown prepaid usage mode: ${mode}`);
+      }
+    };
+
+    const mapDhcpStatus = (status: DhcpStatus): PrismaDhcpStatus => {
+      switch (status) {
+        case DhcpStatus.ENABLED:
+          return PrismaDhcpStatus.ENABLED;
+        case DhcpStatus.DISABLED:
+          return PrismaDhcpStatus.DISABLED;
+        default:
+          throw new Error(`Unknown DHCP status: ${status}`);
+      }
+    };
+
+    const mapWanStatus = (status: WanStatus): PrismaWanStatus => {
+      switch (status) {
+        case WanStatus.READY:
+          return PrismaWanStatus.READY;
+        case WanStatus.ERROR:
+          return PrismaWanStatus.ERROR;
+        case WanStatus.SUSPENDED:
+          return PrismaWanStatus.SUSPENDED;
+        case WanStatus.INITIALIZING:
+          return PrismaWanStatus.INITIALIZING;
+        case WanStatus.ALL_WAN_FORCED_OFF:
+          return PrismaWanStatus.ALL_WAN_FORCED_OFF;
+        case WanStatus.NOT_READY:
+          return PrismaWanStatus.NOT_READY;
+        case WanStatus.QUOTA_REACHED:
+          return PrismaWanStatus.QUOTA_REACHED;
+        case WanStatus.ONLINE:
+          return PrismaWanStatus.ONLINE;
+        default:
+          throw new Error(`Unknown WAN status: ${status}`);
+      }
+    };
+
+    const mapUsageLimitStatus = (
+      status: UsageLimitStatus,
+    ): PrismaUsageLimitStatus => {
+      switch (status) {
+        case UsageLimitStatus.NO_LIMIT:
+          return PrismaUsageLimitStatus.NO_LIMIT;
+        case UsageLimitStatus.LIMIT_ENFORCED:
+          return PrismaUsageLimitStatus.LIMIT_ENFORCED;
+        case UsageLimitStatus.LIMIT_DISABLED:
+          return PrismaUsageLimitStatus.LIMIT_DISABLED;
+        default:
+          throw new Error(`Unknown usage limit status: ${status}`);
+      }
+    };
+
+    const mapUsagePeriodType = (
+      type: UsagePeriodType,
+    ): PrismaUsagePeriodType => {
+      switch (type) {
+        case UsagePeriodType.DAILY:
+          return PrismaUsagePeriodType.DAILY;
+        case UsagePeriodType.WEEKLY:
+          return PrismaUsagePeriodType.WEEKLY;
+        case UsagePeriodType.MONTHLY:
+          return PrismaUsagePeriodType.MONTHLY;
+        default:
+          throw new Error(`Unknown usage period type: ${type}`);
+      }
+    };
+
+    const usageStart = swWan.UsageStart
+      ? new Date(swWan.UsageStart)
+      : undefined;
+
+    const usageBlocked = BigInt(swWan.UsageBlocked);
+    const usageInBytes = BigInt(swWan.UsageBytes);
+    const maxUsageInBytes = BigInt(swWan.UsageMaxBytes);
+    const usagePeriodInDays = swWan.UsagePeriod;
+
+    this.logger.log(
+      chalk.cyan(`Processing WAN: ${swWan.WanName} (${swWan.WanID})`),
+    );
+
+    return {
+      where: {
+        id: swWan.WanID,
+      },
+      update: {
+        wanName: swWan.WanName,
+        wanStatus: mapWanStatus(swWan.Status),
+        prepaidUsageMode: mapPrepaidUsageMode(swWan.AllowPrepaid),
+        dhcp: mapDhcpStatus(swWan.DHCP),
+        dns1: swWan.DNS1,
+        dns2: swWan.DNS2,
+        interfaceId: swWan.InterfaceID,
+        ipAddress: swWan.IpAddress,
+        ipGateway: swWan.IpGateway,
+        prepaidUsageMaxVolume: swWan.PrepaidUsageMaxVolume,
+        prepaidUsagePeriodType: mapUsagePeriodType(
+          swWan.PrepaidUsagePeriodType,
+        ),
+        usageBlocked,
+        usageInBytes,
+        maxUsageInBytes,
+        usagePeriodInDays,
+        usageStart,
+        usagePeriodType: mapUsagePeriodType(swWan.UsagePeriodType),
+        usageLimitStatus: mapUsageLimitStatus(swWan.UsageLimited),
+        updatedAt: new Date(),
+      },
+      create: {
+        id: swWan.WanID,
+        wanName: swWan.WanName,
+        wanStatus: mapWanStatus(swWan.Status),
+        prepaidUsageMode: mapPrepaidUsageMode(swWan.AllowPrepaid),
+        dhcp: mapDhcpStatus(swWan.DHCP),
+        dns1: swWan.DNS1,
+        dns2: swWan.DNS2,
+        interfaceId: swWan.InterfaceID,
+        ipAddress: swWan.IpAddress,
+        ipGateway: swWan.IpGateway,
+        prepaidUsageMaxVolume: swWan.PrepaidUsageMaxVolume,
+        prepaidUsagePeriodType: mapUsagePeriodType(
+          swWan.PrepaidUsagePeriodType,
+        ),
+        usageBlocked,
+        usageInBytes,
+        usageStart,
+        maxUsageInBytes,
+        usagePeriodInDays,
+        usagePeriodType: mapUsagePeriodType(swWan.UsagePeriodType),
+        usageLimitStatus: mapUsageLimitStatus(swWan.UsageLimited),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    };
   }
 
   /**
@@ -308,31 +576,199 @@ export class SnakeWaysWanService extends SnakeWaysBaseService {
     }
   }
 
-  //   /**
-  //    * Get user by ID
-  //    */
-  //   async getUserById(id: string): Promise<User> {
-  //     return this.get<User>(`/user/${id}`);
-  //   }
+  /**
+   * Force an immediate synchronization with Snake Ways
+   * @returns Object containing the number of wans synchronized and the wans themselves
+   */
+  async forceSync(): Promise<{ count: number; wans: PrismaWan[] }> {
+    this.logger.log(
+      chalk.yellow.bold(
+        'Manually triggering wan synchronization with Snake Ways',
+      ),
+    );
+    try {
+      // Fetch latest users from Snake Ways
+      const response = await this.get<{ wan: Wan[] }>('/wan');
 
-  //   /**
-  //    * Create a new user
-  //    */
-  //   async createUser(userData: Omit<User, 'id'>): Promise<User> {
-  //     return this.post<User>('/user', userData);
-  //   }
+      let prismaWans: PrismaWan[] = await this.prismaService.wan.findMany();
 
-  //   /**
-  //    * Update user information
-  //    */
-  //   async updateUser(id: string, userData: Partial<User>): Promise<User> {
-  //     return this.put<User>(`/user/${id}`, userData);
-  //   }
+      if (!response?.wan) {
+        this.logger.warn(
+          chalk.yellow('No wans returned from Snake Ways during force sync'),
+        );
+        // if the external service returns no users, return the users that were already in the database
+        return { count: prismaWans.length, wans: prismaWans };
+      }
 
-  //   /**
-  //    * Delete a user
-  //    */
-  //   async deleteUser(id: string): Promise<{ success: boolean }> {
-  //     return this.delete<{ success: boolean }>(`/user/${id}`);
-  //   }
+      // Perform synchronization
+      await this.syncWansWithDatabase(response.wan);
+
+      this.logger.log(
+        chalk.green.bold(
+          `Force sync completed: ${chalk.white(response.wan.length)} wans synchronized`,
+        ),
+      );
+
+      prismaWans = await this.prismaService.wan.findMany();
+
+      return { count: prismaWans.length, wans: prismaWans };
+    } catch (error) {
+      this.logger.error(chalk.red.bold('Force sync failed'), error);
+      throw new Error(`Force synchronization failed: ${error.message}`);
+    }
+  }
+
+  onModuleDestroy() {
+    if (this.wanPollingSubscription) {
+      this.logger.log(chalk.blue('Stopping wan polling'));
+      this.wanPollingSubscription.unsubscribe();
+      this.pollingActive = false;
+    }
+  }
+
+  transformToWanEntities(swWans: Wan[]) {
+    const wans: WanEntity[] = [];
+
+    for (const swWan of swWans) {
+      // Map Snake Ways WAN status to Prisma WAN status
+      const wanStatus = (() => {
+        switch (swWan.Status) {
+          case WanStatus.READY:
+            return PrismaWanStatus.READY;
+          case WanStatus.ERROR:
+            return PrismaWanStatus.ERROR;
+          case WanStatus.SUSPENDED:
+            return PrismaWanStatus.SUSPENDED;
+          case WanStatus.INITIALIZING:
+            return PrismaWanStatus.INITIALIZING;
+          case WanStatus.ALL_WAN_FORCED_OFF:
+            return PrismaWanStatus.ALL_WAN_FORCED_OFF;
+          case WanStatus.NOT_READY:
+            return PrismaWanStatus.NOT_READY;
+          case WanStatus.QUOTA_REACHED:
+            return PrismaWanStatus.QUOTA_REACHED;
+          case WanStatus.ONLINE:
+            return PrismaWanStatus.ONLINE;
+          default:
+            return PrismaWanStatus.NOT_READY;
+        }
+      })();
+
+      // Map Snake Ways prepaid usage mode to Prisma prepaid usage mode
+      const prepaidUsageMode = (() => {
+        switch (swWan.AllowPrepaid) {
+          case PrepaidUsageMode.DISALLOW:
+            return PrismaPrepaidUsageMode.DISALLOW;
+          case PrepaidUsageMode.ALLOW:
+            return PrismaPrepaidUsageMode.ALLOW;
+          case PrepaidUsageMode.LIMITED:
+            return PrismaPrepaidUsageMode.LIMITED;
+          default:
+            return PrismaPrepaidUsageMode.ALLOW;
+        }
+      })();
+
+      // Map Snake Ways DHCP status to Prisma DHCP status
+      const dhcpStatus = (() => {
+        switch (swWan.DHCP) {
+          case DhcpStatus.ENABLED:
+            return PrismaDhcpStatus.ENABLED;
+          case DhcpStatus.DISABLED:
+            return PrismaDhcpStatus.DISABLED;
+          default:
+            return PrismaDhcpStatus.ENABLED;
+        }
+      })();
+
+      // Map Snake Ways usage limit status to Prisma usage limit status
+      const usageLimitStatus = (() => {
+        switch (swWan.UsageLimited) {
+          case UsageLimitStatus.NO_LIMIT:
+            return PrismaUsageLimitStatus.NO_LIMIT;
+          case UsageLimitStatus.LIMIT_ENFORCED:
+            return PrismaUsageLimitStatus.LIMIT_ENFORCED;
+          case UsageLimitStatus.LIMIT_DISABLED:
+            return PrismaUsageLimitStatus.LIMIT_DISABLED;
+          default:
+            return PrismaUsageLimitStatus.NO_LIMIT;
+        }
+      })();
+
+      // Map Snake Ways usage period type to Prisma usage period type
+      const usagePeriodType = swWan.UsagePeriodType
+        ? (() => {
+            switch (swWan.UsagePeriodType) {
+              case UsagePeriodType.DAILY:
+                return PrismaUsagePeriodType.DAILY;
+              case UsagePeriodType.WEEKLY:
+                return PrismaUsagePeriodType.WEEKLY;
+              case UsagePeriodType.MONTHLY:
+                return PrismaUsagePeriodType.MONTHLY;
+              default:
+                return PrismaUsagePeriodType.MONTHLY;
+            }
+          })()
+        : null;
+
+      // Map Snake Ways prepaid usage period type to Prisma usage period type
+      const prepaidUsagePeriodType = swWan.PrepaidUsagePeriodType
+        ? (() => {
+            switch (swWan.PrepaidUsagePeriodType) {
+              case UsagePeriodType.DAILY:
+                return PrismaUsagePeriodType.DAILY;
+              case UsagePeriodType.WEEKLY:
+                return PrismaUsagePeriodType.WEEKLY;
+              case UsagePeriodType.MONTHLY:
+                return PrismaUsagePeriodType.MONTHLY;
+              default:
+                return PrismaUsagePeriodType.MONTHLY;
+            }
+          })()
+        : null;
+
+      // Convert usage start to Date object
+      const usageStart = swWan.UsageStart ? new Date(swWan.UsageStart) : null;
+
+      // Convert numeric values to BigInt
+      const usageBlocked = BigInt(swWan.UsageBlocked);
+      const usageInBytes = BigInt(swWan.UsageBytes);
+      const maxUsageInBytes = BigInt(swWan.UsageMaxBytes);
+      const prepaidUsageMaxVolume = swWan.PrepaidUsageMaxVolume
+        ? BigInt(swWan.PrepaidUsageMaxVolume)
+        : null;
+
+      // Create a WanEntity instance
+      const wanEntity = new WanEntity({
+        id: swWan.WanID,
+        userId: '', // This would need to be set based on your application's logic
+        wanId: swWan.WanID,
+        wanName: swWan.WanName,
+        wanStatus,
+        prepaidUsageMode,
+        dhcp: dhcpStatus,
+        dns1: swWan.DNS1,
+        dns2: swWan.DNS2,
+        interfaceId: swWan.InterfaceID,
+        ipAddress: swWan.IpAddress,
+        ipGateway: swWan.IpGateway,
+        prepaidUsageMaxVolume,
+        prepaidUsagePeriodType,
+        subnetmask: swWan.Subnetmask,
+        switchPriority: swWan.SwitchPriority,
+        usageBlocked,
+        usageInBytes,
+        usageLimitStatus,
+        maxUsageInBytes,
+        usagePeriodInDays: swWan.UsagePeriod,
+        usagePeriodType,
+        usageStart,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      wans.push(wanEntity);
+    }
+
+    return wans;
+  }
 }

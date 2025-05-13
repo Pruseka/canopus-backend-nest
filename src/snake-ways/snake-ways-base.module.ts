@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SnakeWaysBaseService } from './snake-ways-base.service';
 import { SnakeWaysUserService } from './user/snake-ways-user.service';
 import * as https from 'https';
+import { SnakeWaysWanService } from './wan/snake-ways-wan.service';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import * as https from 'https';
       }),
     }),
   ],
-  providers: [SnakeWaysBaseService, SnakeWaysUserService],
-  exports: [SnakeWaysBaseService, SnakeWaysUserService],
+  providers: [SnakeWaysBaseService, SnakeWaysUserService, SnakeWaysWanService],
+  exports: [SnakeWaysBaseService, SnakeWaysUserService, SnakeWaysWanService],
 })
 export class SnakeWaysBaseModule {}

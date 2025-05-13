@@ -64,9 +64,10 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
   async getSnakeWaysUsers(): Promise<UserEntity[]> {
     try {
       const swUsers = await this.swUserService.getAllUsers();
-      if (!swUsers || swUsers.length === 0) {
+
+      // If we get an empty array but no error, log a warning
+      if (swUsers.length === 0) {
         this.logger.warn(chalk.yellow('No users returned from Snake Ways'));
-        return [];
       }
 
       // Transform to UserEntity objects using the SnakeWaysUserService
@@ -76,7 +77,8 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
         chalk.red('Error fetching users from Snake Ways'),
         error,
       );
-      return [];
+      // Re-throw the error so it propagates to the controller
+      throw error;
     }
   }
 
@@ -196,7 +198,7 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
     try {
       this.logger.log(chalk.cyan('Attempting to restart Snake Ways polling'));
 
-      const wasRestarted = this.swUserService.restartPollingIfStopped();
+      const wasRestarted = await this.swUserService.restartPollingIfStopped();
 
       if (wasRestarted) {
         this.logger.log(

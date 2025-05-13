@@ -1,22 +1,16 @@
-import {
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { SignUpDto, SignInDto, SignInErrorDto, AuthResponseDto } from './dto';
-import * as argon from 'argon2';
-import { JwtService } from '@nestjs/jwt';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { Status, User, UserAccessLevel } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { TokensResponseDto } from './interfaces/tokens-response.interface';
-import { JwtPayload } from './interfaces/jwt-payload.interface';
-import { UserService } from 'src/user/user.service';
-import { SignupErrorException } from './exceptions/sign-up-error.exception';
+import * as argon from 'argon2';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { UserEntity } from 'src/user/entities/';
-import { plainToInstance } from 'class-transformer';
-import { Pending, User, UserAccessLevel } from '@prisma/client';
+import { UserService } from 'src/user/user.service';
 import { Validator } from '../common/utils/validator';
+import { AuthResponseDto, SignInDto, SignInErrorDto, SignUpDto } from './dto';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { TokensResponseDto } from './interfaces/tokens-response.interface';
 
 @Injectable()
 export class AuthService {
@@ -74,7 +68,7 @@ export class AuthService {
           accessLevel: UserAccessLevel.USER,
           autoCredit: false,
           dataCredit: BigInt(0),
-          pending: Pending.PENDING,
+          status: Status.PENDING,
           portalConnectedAt: null,
           timeCredit: BigInt(0),
           displayName: dto.username,

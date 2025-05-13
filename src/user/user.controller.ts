@@ -42,9 +42,18 @@ export class UserController {
     description: 'Returns all users from Snake Ways',
     type: [UserEntity],
   })
+  @ApiResponse({
+    status: 503,
+    description: 'Snake Ways service is unavailable',
+  })
   @ApiOperation({ summary: 'Get users directly from Snake Ways' })
   async getSnakeWaysUsers(): Promise<UserEntity[]> {
-    return await this.userService.getSnakeWaysUsers();
+    try {
+      return await this.userService.getSnakeWaysUsers();
+    } catch (error) {
+      // Let NestJS handle the error with its built-in exception filter
+      throw error;
+    }
   }
 
   @Post('sync')
@@ -53,9 +62,18 @@ export class UserController {
     description: 'Force sync with Snake Ways and return results',
     type: [UserEntity],
   })
+  @ApiResponse({
+    status: 503,
+    description: 'Snake Ways service is unavailable',
+  })
   @ApiOperation({ summary: 'Force synchronization with Snake Ways' })
   async forceSyncUsers(): Promise<UserEntity[]> {
-    return await this.userService.forceSyncUsers();
+    try {
+      return await this.userService.forceSyncUsers();
+    } catch (error) {
+      // Let NestJS handle the error with its built-in exception filter
+      throw error;
+    }
   }
 
   @Post('restart-polling')

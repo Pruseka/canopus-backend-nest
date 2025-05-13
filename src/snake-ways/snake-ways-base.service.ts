@@ -18,19 +18,21 @@ import { AxiosError, AxiosRequestConfig } from 'axios';
 @Injectable()
 export class SnakeWaysBaseService {
   protected readonly logger = new Logger(SnakeWaysBaseService.name);
+  // Keep serviceAvailable but only use it for diagnostic purposes and one-time requests
   private serviceAvailable = true;
-  private consecutiveFailures = 0;
+  private consecutiveFailuresMap: Map<string, number> = new Map();
   private readonly maxConsecutiveFailures = 10;
 
   constructor(protected readonly httpService: HttpService) {
-    // Check service availability on startup
+    // Check service availability on startup - just for diagnostic purposes
     this.checkServiceAvailability();
   }
 
   /**
    * Check if the external service is available
+   * This is primarily for diagnostic purposes
    */
-  private async checkServiceAvailability() {
+  public async checkServiceAvailability() {
     try {
       await firstValueFrom(
         this.httpService.get('/').pipe(
@@ -38,9 +40,9 @@ export class SnakeWaysBaseService {
           catchError((error) => {
             if (error.code === 'ECONNREFUSED') {
               this.serviceAvailable = false;
-              this.consecutiveFailures++;
+              this.incrementConsecutiveFailures('/');
               this.logger.warn(
-                `Snake Ways service connection refused at ${error.config?.baseURL || 'the configured URL'}. Some features may be limited. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
+                `Snake Ways service connection refused at ${error.config?.baseURL || 'the configured URL'}. Some features may be limited. Consecutive failures: ${this.getConsecutiveFailures('/')}/${this.maxConsecutiveFailures}`,
               );
             } else if (
               error.code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
@@ -51,12 +53,12 @@ export class SnakeWaysBaseService {
                 'SSL certificate validation issue, but continuing anyway due to httpsAgent configuration.',
               );
               this.serviceAvailable = true; // We're still considering the service available
-              this.resetConsecutiveFailures();
+              this.resetConsecutiveFailures('/');
             } else {
               this.serviceAvailable = false;
-              this.consecutiveFailures++;
+              this.incrementConsecutiveFailures('/');
               this.logger.warn(
-                `Snake Ways service is not available. Error: ${error.message}. Some features may be limited. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
+                `Snake Ways service is not currently available. Error: ${error.message}. Some features may be limited. Consecutive failures: ${this.getConsecutiveFailures('/')}/${this.maxConsecutiveFailures}`,
               );
             }
             return of({ data: null });
@@ -65,50 +67,81 @@ export class SnakeWaysBaseService {
       );
     } catch (error) {
       this.serviceAvailable = false;
-      this.consecutiveFailures++;
+      this.incrementConsecutiveFailures('/');
       this.logger.warn(
-        `Snake Ways service is not available. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Some features may be limited. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
+        `Snake Ways service is not available. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Some features may be limited. Consecutive failures: ${this.getConsecutiveFailures('/')}/${this.maxConsecutiveFailures}`,
       );
     }
   }
 
   /**
-   * Reset the consecutive failures counter when service becomes available
+   * Get the consecutive failures count for a specific endpoint
    */
-  protected resetConsecutiveFailures() {
-    if (this.consecutiveFailures > 0) {
+  protected getConsecutiveFailures(endpoint: string): number {
+    return this.consecutiveFailuresMap.get(endpoint) || 0;
+  }
+
+  /**
+   * Increment the consecutive failures counter for a specific endpoint
+   */
+  protected incrementConsecutiveFailures(endpoint: string): void {
+    const currentFailures = this.getConsecutiveFailures(endpoint);
+    this.consecutiveFailuresMap.set(endpoint, currentFailures + 1);
+  }
+
+  /**
+   * Reset the consecutive failures counter for a specific endpoint when service becomes available
+   */
+  protected resetConsecutiveFailures(endpoint: string): void {
+    const currentFailures = this.getConsecutiveFailures(endpoint);
+    if (currentFailures > 0) {
       this.logger.log(
-        `Resetting consecutive failures counter from ${this.consecutiveFailures} to 0`,
+        `Resetting consecutive failures counter for ${endpoint} from ${currentFailures} to 0`,
       );
-      this.consecutiveFailures = 0;
+      this.consecutiveFailuresMap.set(endpoint, 0);
     }
   }
 
   /**
-   * Check if we should stop polling due to too many consecutive failures
+   * Reset service availability status
+   * This should be called when attempting to restart polling
    */
-  protected shouldStopPolling(): boolean {
-    return this.consecutiveFailures >= this.maxConsecutiveFailures;
+  protected resetServiceAvailability(): void {
+    if (!this.serviceAvailable) {
+      this.logger.log(
+        'Resetting service availability status from unavailable to available',
+      );
+      this.serviceAvailable = true;
+    }
+  }
+
+  /**
+   * Check if we should stop polling due to too many consecutive failures for a specific endpoint
+   */
+  protected shouldStopPolling(endpoint: string): boolean {
+    return this.getConsecutiveFailures(endpoint) >= this.maxConsecutiveFailures;
   }
 
   /**
    * Perform a GET request to the external service
+   * For one-time requests, we still check serviceAvailable to avoid unnecessary network calls
    */
   protected async get<T>(
     endpoint: string,
     config?: AxiosRequestConfig,
   ): Promise<T | null> {
-    if (!this.serviceAvailable) {
-      this.logger.warn(
-        `GET ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
-      );
-      return null;
-    }
+    // For one-time requests, still check serviceAvailable to avoid unnecessary network calls
+    // if (!this.serviceAvailable) {
+    //   this.logger.warn(
+    //     `GET ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
+    //   );
+    //   return null;
+    // }
 
     try {
       const { data } = await firstValueFrom(
         this.httpService.get<T>(endpoint, config).pipe(
-          timeout(10000),
+          timeout(3000),
           catchError((error: AxiosError) => {
             this.handleError('GET', endpoint, error);
             return of({ data: null as T });
@@ -117,11 +150,11 @@ export class SnakeWaysBaseService {
       );
 
       // If we get here, the request succeeded
-      this.resetConsecutiveFailures();
+      this.resetConsecutiveFailures(endpoint);
       return data;
     } catch (error) {
       this.logger.error(`Failed GET request to ${endpoint}`);
-      return null;
+      throw error;
     }
   }
 
@@ -133,25 +166,31 @@ export class SnakeWaysBaseService {
     payload: any,
     config?: AxiosRequestConfig,
   ): Promise<T | null> {
+    // For one-time requests, still check serviceAvailable to avoid unnecessary network calls
     if (!this.serviceAvailable) {
-      this.logger.warn(`POST ${endpoint} skipped: Service unavailable`);
+      this.logger.warn(
+        `POST ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
+      );
       return null;
     }
 
     try {
       const { data } = await firstValueFrom(
         this.httpService.post<T>(endpoint, payload, config).pipe(
-          timeout(10000),
+          timeout(3000),
           catchError((error: AxiosError) => {
             this.handleError('POST', endpoint, error);
             return of({ data: null as T });
           }),
         ),
       );
+
+      // If we get here, the request succeeded
+      this.resetConsecutiveFailures(endpoint);
       return data;
     } catch (error) {
       this.logger.error(`Failed POST request to ${endpoint}`);
-      return null;
+      throw error;
     }
   }
 
@@ -163,25 +202,31 @@ export class SnakeWaysBaseService {
     payload: any,
     config?: AxiosRequestConfig,
   ): Promise<T | null> {
+    // For one-time requests, still check serviceAvailable to avoid unnecessary network calls
     if (!this.serviceAvailable) {
-      this.logger.warn(`PUT ${endpoint} skipped: Service unavailable`);
+      this.logger.warn(
+        `PUT ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
+      );
       return null;
     }
 
     try {
       const { data } = await firstValueFrom(
         this.httpService.put<T>(endpoint, payload, config).pipe(
-          timeout(10000),
+          timeout(3000),
           catchError((error: AxiosError) => {
             this.handleError('PUT', endpoint, error);
             return of({ data: null as T });
           }),
         ),
       );
+
+      // If we get here, the request succeeded
+      this.resetConsecutiveFailures(endpoint);
       return data;
     } catch (error) {
       this.logger.error(`Failed PUT request to ${endpoint}`);
-      return null;
+      throw error;
     }
   }
 
@@ -192,25 +237,31 @@ export class SnakeWaysBaseService {
     endpoint: string,
     config?: AxiosRequestConfig,
   ): Promise<T | null> {
+    // For one-time requests, still check serviceAvailable to avoid unnecessary network calls
     if (!this.serviceAvailable) {
-      this.logger.warn(`DELETE ${endpoint} skipped: Service unavailable`);
+      this.logger.warn(
+        `DELETE ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
+      );
       return null;
     }
 
     try {
       const { data } = await firstValueFrom(
         this.httpService.delete<T>(endpoint, config).pipe(
-          timeout(10000),
+          timeout(3000),
           catchError((error: AxiosError) => {
             this.handleError('DELETE', endpoint, error);
             return of({ data: null as T });
           }),
         ),
       );
+
+      // If we get here, the request succeeded
+      this.resetConsecutiveFailures(endpoint);
       return data;
     } catch (error) {
       this.logger.error(`Failed DELETE request to ${endpoint}`);
-      return null;
+      throw error;
     }
   }
 
@@ -227,40 +278,67 @@ export class SnakeWaysBaseService {
 
     return interval(intervalMs).pipe(
       startWith(0), // Emit immediately on subscription
-      takeWhile(() => !this.shouldStopPolling()), // Stop if too many failures
+      takeWhile(() => !this.shouldStopPolling(endpoint)), // Stop if too many failures
       switchMap(() => {
-        if (!this.serviceAvailable) {
-          this.consecutiveFailures++;
-          this.logger.warn(
-            `Polling ${endpoint} skipped: Service unavailable. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
-          );
-
-          // Check if we've reached max failures
-          if (this.shouldStopPolling()) {
-            this.logger.error(
-              `Stopping polling for ${endpoint} after ${this.maxConsecutiveFailures} consecutive failures`,
-            );
-          }
-
-          return of(null);
-        }
-
+        // For polling, we always attempt the request regardless of serviceAvailable
+        // This allows recovery from temporary service outages
         return this.httpService.get<T>(endpoint).pipe(
+          timeout(3000),
           map((response) => {
             // Reset failure counter on success
-            this.resetConsecutiveFailures();
+            this.resetConsecutiveFailures(endpoint);
+            // Also reset service availability flag
+            this.resetServiceAvailability();
             return response.data;
           }),
           catchError((error) => {
-            this.handleError('GET', endpoint, error);
-            this.consecutiveFailures++;
+            // For polling, we need to handle errors differently than one-time requests
+            // We'll log the error and increment the failure counter, but not throw
+            if (error.code === 'ECONNREFUSED') {
+              // Only set serviceAvailable to false for connection refused errors
+              this.serviceAvailable = false;
+              this.incrementConsecutiveFailures(endpoint);
+              this.logger.warn(
+                `Snake Ways service is not available at ${error.config?.baseURL || 'the configured URL'}. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
+              );
+            } else if (
+              error.code === 'ETIMEDOUT' ||
+              error.code === 'ECONNABORTED'
+            ) {
+              this.incrementConsecutiveFailures(endpoint);
+              this.logger.warn(
+                `Request to ${endpoint} timed out. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
+              );
+            } else if (
+              error.code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+              error.code === 'CERT_HAS_EXPIRED' ||
+              error.code === 'ERR_TLS_CERT_ALTNAME_INVALID'
+            ) {
+              this.logger.warn(
+                `SSL certificate validation issue for ${endpoint}, but continuing due to httpsAgent configuration.`,
+              );
+              this.resetConsecutiveFailures(endpoint);
+            } else if (error.response) {
+              this.logger.error(
+                `GET ${endpoint} failed with status ${error.response.status}: ${JSON.stringify(error.response.data)}`,
+              );
+              this.resetConsecutiveFailures(endpoint);
+            } else if (error.request) {
+              this.logger.error(
+                `GET ${endpoint} failed: No response received from server`,
+              );
+              this.incrementConsecutiveFailures(endpoint);
+            } else {
+              this.logger.error(`GET ${endpoint} failed: ${error.message}`);
+              this.incrementConsecutiveFailures(endpoint);
+            }
 
             this.logger.warn(
-              `Failed to poll ${endpoint}. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
+              `Failed to poll ${endpoint}. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
             );
 
             // Check if we've reached max failures
-            if (this.shouldStopPolling()) {
+            if (this.shouldStopPolling(endpoint)) {
               this.logger.error(
                 `Stopping polling for ${endpoint} after ${this.maxConsecutiveFailures} consecutive failures`,
               );
@@ -283,12 +361,23 @@ export class SnakeWaysBaseService {
     error: AxiosError,
   ): void {
     if (error.code === 'ECONNREFUSED') {
+      // Only set serviceAvailable to false for connection refused errors
       this.serviceAvailable = false;
-      this.consecutiveFailures++;
+      this.incrementConsecutiveFailures(endpoint);
       this.logger.warn(
-        `Snake Ways service is not available at ${error.config?.baseURL || 'the configured URL'}. Consecutive failures: ${this.consecutiveFailures}/${this.maxConsecutiveFailures}`,
+        `Snake Ways service is not available at ${error.config?.baseURL || 'the configured URL'}. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
       );
-      return;
+      throw error;
+    }
+
+    // Handle timeout errors
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      this.incrementConsecutiveFailures(endpoint);
+      this.logger.warn(
+        `Request to ${endpoint} timed out. Consecutive failures: ${this.getConsecutiveFailures(endpoint)}/${this.maxConsecutiveFailures}`,
+      );
+      // Don't set serviceAvailable to false for timeouts, as they might be temporary
+      throw error;
     }
 
     // Handle SSL certificate errors
@@ -300,8 +389,8 @@ export class SnakeWaysBaseService {
       this.logger.warn(
         `SSL certificate validation issue for ${method} ${endpoint}, but continuing due to httpsAgent configuration.`,
       );
-      this.resetConsecutiveFailures(); // Reset counter for SSL issues we're ignoring
-      return;
+      this.resetConsecutiveFailures(endpoint); // Reset counter for SSL issues we're ignoring
+      throw error;
     }
 
     if (error.response) {
@@ -310,17 +399,21 @@ export class SnakeWaysBaseService {
         `${method} ${endpoint} failed with status ${error.response.status}: ${JSON.stringify(error.response.data)}`,
       );
       // Don't increment failures for HTTP responses (even errors) as the service is technically available
-      this.resetConsecutiveFailures();
+      this.resetConsecutiveFailures(endpoint);
+      throw error;
     } else if (error.request) {
       // The request was made but no response was received
       this.logger.error(
         `${method} ${endpoint} failed: No response received from server`,
       );
-      this.consecutiveFailures++;
+      this.incrementConsecutiveFailures(endpoint);
+      // Don't set serviceAvailable to false for no response, as they might be temporary
+      throw error;
     } else {
       // Something happened in setting up the request that triggered an Error
       this.logger.error(`${method} ${endpoint} failed: ${error.message}`);
-      this.consecutiveFailures++;
+      this.incrementConsecutiveFailures(endpoint);
+      throw error;
     }
   }
 }

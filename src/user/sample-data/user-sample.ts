@@ -1,6 +1,6 @@
 import { UserEntity } from '../entities/user.entity';
 import { UserHistorySnapshotEntity } from '../entities/user-history-snapshot.entity';
-import { Pending, UserAccessLevel } from '@prisma/client';
+import { Status, UserAccessLevel } from '@prisma/client';
 
 /**
  * Sample users that can be used for testing or mocking user controller responses
@@ -16,7 +16,7 @@ export const sampleUsers: UserEntity[] = [
     autoCredit: true,
     dataCredit: 5368709120, // 5GB
     timeCredit: 86400 * 7, // 7 days in seconds
-    pending: Pending.REGISTERED,
+    status: Status.REGISTERED,
     portalConnectedAt: new Date(),
     createdAt: new Date('2023-05-15T10:30:00Z'),
     updatedAt: new Date('2023-06-20T14:45:00Z'),
@@ -33,7 +33,7 @@ export const sampleUsers: UserEntity[] = [
     autoCredit: true,
     dataCredit: 3221225472, // 3GB
     timeCredit: 86400 * 5, // 5 days in seconds
-    pending: Pending.REGISTERED,
+    status: Status.REGISTERED,
     portalConnectedAt: new Date(Date.now() - 3600000), // 1 hour ago
     createdAt: new Date('2023-05-20T11:15:00Z'),
     updatedAt: new Date('2023-06-22T09:30:00Z'),
@@ -49,7 +49,7 @@ export const sampleUsers: UserEntity[] = [
     autoCredit: false,
     dataCredit: 1073741824, // 1GB
     timeCredit: 3600 * 24, // 24 hours in seconds
-    pending: Pending.REGISTERED,
+    status: Status.REGISTERED,
     portalConnectedAt: new Date(Date.now() - 86400000), // 1 day ago
     createdAt: new Date('2023-06-01T08:00:00Z'),
     updatedAt: new Date('2023-06-10T16:20:00Z'),
@@ -66,7 +66,7 @@ export const sampleUsers: UserEntity[] = [
     autoCredit: false,
     dataCredit: 536870912, // 512MB
     timeCredit: 3600 * 12, // 12 hours in seconds
-    pending: Pending.REGISTERED,
+    status: Status.REGISTERED,
     portalConnectedAt: null, // Not connected yet
     createdAt: new Date('2023-06-05T15:45:00Z'),
     updatedAt: new Date('2023-06-05T15:45:00Z'),
@@ -82,7 +82,7 @@ export const sampleUsers: UserEntity[] = [
     autoCredit: false,
     dataCredit: 0,
     timeCredit: 0,
-    pending: Pending.PENDING,
+    status: Status.PENDING,
     portalConnectedAt: null,
     createdAt: new Date('2023-06-18T11:30:00Z'),
     updatedAt: new Date('2023-06-18T11:30:00Z'),
@@ -104,7 +104,7 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     autoCredit: false,
     dataCredit: 2147483648, // 2GB (different from current)
     timeCredit: 3600 * 48, // 48 hours
-    pending: Pending.REGISTERED,
+    status: Status.REGISTERED,
     portalConnectedAt: new Date('2023-05-24T23:00:00Z'),
     createdAt: new Date('2023-05-25T00:01:00Z'),
     updatedAt: new Date('2023-05-25T00:01:00Z'),
@@ -119,7 +119,7 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     autoCredit: false,
     dataCredit: 1610612736, // 1.5GB
     timeCredit: 3600 * 36, // 36 hours
-    pending: Pending.REGISTERED,
+    status: Status.REGISTERED,
     portalConnectedAt: new Date('2023-05-27T22:00:00Z'),
     createdAt: new Date('2023-05-28T00:01:00Z'),
     updatedAt: new Date('2023-05-28T00:01:00Z'),
@@ -134,7 +134,7 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     autoCredit: false,
     dataCredit: 1288490188, // 1.2GB
     timeCredit: 3600 * 30, // 30 hours
-    pending: Pending.REGISTERED,
+    status: Status.REGISTERED,
     portalConnectedAt: new Date('2023-05-31T21:30:00Z'),
     createdAt: new Date('2023-06-01T00:01:00Z'),
     updatedAt: new Date('2023-06-01T00:01:00Z'),

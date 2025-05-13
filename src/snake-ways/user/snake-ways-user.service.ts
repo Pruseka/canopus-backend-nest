@@ -1,12 +1,17 @@
 // src/external-service/external-user.service.ts
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { SnakeWaysBaseService } from '../snake-ways-base.service';
 import { ApiProperty } from '@nestjs/swagger';
 import { Observable, Subscription } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
-  Pending,
+  Status,
   User as PrismaUser,
   UserAccessLevel as PrismaUserAccessLevel,
 } from '@prisma/client';
@@ -155,7 +160,7 @@ export class User {
 @Injectable()
 export class SnakeWaysUserService
   extends SnakeWaysBaseService
-  implements OnModuleInit
+  implements OnModuleInit, OnModuleDestroy
 {
   private userPollingSubscription: Subscription;
   private userDataStream$: Observable<{ user: User[] } | null>;
@@ -192,7 +197,7 @@ export class SnakeWaysUserService
   private startPollingUsers() {
     if (this.pollingActive) {
       this.logger.log(
-        chalk.yellow('Polling is already active, not starting again'),
+        chalk.yellow('Users Polling is already active, not starting again'),
       );
       return;
     }
@@ -207,7 +212,7 @@ export class SnakeWaysUserService
 
     this.userDataStream$ = this.createPollingObservable<{ user: User[] }>(
       '/user',
-      this.pollingIntervalInMins * 60 * 1000, // Convert minutes to milliseconds
+      this.pollingIntervalInMins * 1000, // Convert minutes to milliseconds
     );
 
     this.userPollingSubscription = this.userDataStream$.subscribe({
@@ -217,15 +222,22 @@ export class SnakeWaysUserService
         }
       },
       error: (error) => {
+        // This should rarely be called since we're catching errors in the observable
         this.logger.error(
-          chalk.red.bold('Error polling users from Snake Ways'),
+          chalk.red.bold('Unexpected error in user polling subscription'),
           error,
         );
-        this.pollingActive = false;
+        // Don't set pollingActive to false here to allow retries
+        // Instead, log that we'll try to recover
+        this.logger.warn(
+          chalk.yellow.bold('Attempting to recover from polling error'),
+        );
       },
       complete: () => {
         this.logger.warn(
-          chalk.yellow.bold('Polling completed or stopped due to max failures'),
+          chalk.yellow.bold(
+            'Polling users from Snake Ways completed or stopped due to max failures',
+          ),
         );
         this.pollingActive = false;
       },
@@ -236,11 +248,13 @@ export class SnakeWaysUserService
    * Attempt to restart polling if it has stopped
    * This can be called by a controller endpoint or scheduled job
    */
-  public restartPollingIfStopped(): boolean {
+  public async restartPollingIfStopped(): Promise<boolean> {
     if (!this.pollingActive) {
       this.logger.log(chalk.blue.bold('Attempting to restart user polling'));
-      // Reset the consecutive failures counter in the base service
-      this.resetConsecutiveFailures();
+      // Reset the service availability status
+      this.resetServiceAvailability();
+      // Reset the consecutive failures counter for this endpoint
+      this.resetConsecutiveFailures('/user');
       // Start polling again
       this.startPollingUsers();
       return true;
@@ -290,7 +304,7 @@ export class SnakeWaysUserService
               snapshotDate: today,
               dataCredit: user.dataCredit,
               timeCredit: user.timeCredit,
-              pending: user.pending,
+              status: user.status,
               portalConnectedAt: user.portalConnectedAt,
               accessLevel: user.accessLevel,
               autoCredit: user.autoCredit,
@@ -310,7 +324,7 @@ export class SnakeWaysUserService
             data: {
               dataCredit: user.dataCredit,
               timeCredit: user.timeCredit,
-              pending: user.pending,
+              status: user.status,
               portalConnectedAt: user.portalConnectedAt,
               accessLevel: user.accessLevel,
               autoCredit: user.autoCredit,
@@ -357,11 +371,11 @@ export class SnakeWaysUserService
     };
 
     // Map Snake Ways Pending to Prisma Pending
-    const mapPending = (pending: UserStatus): Pending => {
-      if (pending === UserStatus.REGISTERED) return Pending.REGISTERED;
-      else if (pending > 0 && pending < UserStatus.REGISTERED)
-        return Pending.ERROR;
-      else return Pending.PENDING;
+    const mapStatus = (status: UserStatus): Status => {
+      if (status === UserStatus.REGISTERED) return Status.REGISTERED;
+      else if (status > 0 && status < UserStatus.REGISTERED)
+        return Status.ERROR;
+      else return Status.PENDING;
     };
 
     // Create a date from timestamp or now
@@ -389,7 +403,7 @@ export class SnakeWaysUserService
         accessLevel: mapAccessLevel(swUser.AccessLevel),
         autoCredit: swUser.AutoCreditEnabled === AutoCreditStatus.ENABLED,
         dataCredit,
-        pending: mapPending(swUser.Pending),
+        status: mapStatus(swUser.Pending),
         portalConnectedAt,
         timeCredit,
         updatedAt: new Date(),
@@ -403,7 +417,7 @@ export class SnakeWaysUserService
         accessLevel: mapAccessLevel(swUser.AccessLevel),
         autoCredit: swUser.AutoCreditEnabled === AutoCreditStatus.ENABLED,
         dataCredit,
-        pending: mapPending(swUser.Pending),
+        status: mapStatus(swUser.Pending),
         portalConnectedAt,
         timeCredit,
         createdAt: new Date(),
@@ -421,7 +435,7 @@ export class SnakeWaysUserService
       return response?.user || [];
     } catch (error) {
       this.logger.error(chalk.red('Failed to get users'), error);
-      return [];
+      throw error;
     }
   }
 
@@ -502,11 +516,11 @@ export class SnakeWaysUserService
       })();
 
       // Map Snake Ways Pending to Prisma Pending
-      const pending = (() => {
-        if (swUser.Pending === UserStatus.REGISTERED) return Pending.REGISTERED;
+      const status = (() => {
+        if (swUser.Pending === UserStatus.REGISTERED) return Status.REGISTERED;
         else if (swUser.Pending > 0 && swUser.Pending < UserStatus.REGISTERED)
-          return Pending.ERROR;
-        else return Pending.PENDING;
+          return Status.ERROR;
+        else return Status.PENDING;
       })();
 
       // Create a date from timestamp or now
@@ -529,7 +543,7 @@ export class SnakeWaysUserService
         accessLevel: accessLevel,
         autoCredit: swUser.AutoCreditEnabled === AutoCreditStatus.ENABLED,
         dataCredit,
-        pending: pending,
+        status: status,
         portalConnectedAt: portalConnectedAt,
         timeCredit,
         createdAt: new Date(),

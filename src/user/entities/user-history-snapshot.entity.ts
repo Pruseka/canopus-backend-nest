@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Pending, UserAccessLevel, UserHistorySnapshot } from '@prisma/client';
+import { Status, UserAccessLevel, UserHistorySnapshot } from '@prisma/client';
 
 export class UserHistorySnapshotEntity
   implements Omit<UserHistorySnapshot, 'timeCredit' | 'dataCredit'>
@@ -93,11 +93,11 @@ export class UserHistorySnapshotEntity
   dataCredit: number;
 
   @ApiProperty({
-    enum: Pending,
+    enum: Status,
     description: 'User status',
-    example: Pending.REGISTERED,
+    example: Status.REGISTERED,
   })
-  pending: Pending;
+  status: Status;
 
   @ApiProperty({
     description: 'When the user last connected to the portal',

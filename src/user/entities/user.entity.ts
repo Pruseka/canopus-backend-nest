@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Pending, User, UserAccessLevel } from '@prisma/client';
+import { Status, User, UserAccessLevel } from '@prisma/client';
 import { Exclude } from 'class-transformer';
 
 export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
@@ -97,11 +97,11 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
   displayName: string | null;
 
   @ApiProperty({
-    enum: Pending,
+    enum: Status,
     description: 'User status',
-    example: Pending.REGISTERED,
+    example: Status.REGISTERED,
   })
-  pending: Pending;
+  status: Status;
 
   @ApiProperty({
     description:
