@@ -11,7 +11,7 @@ import { UserEntity } from './entities/user.entity';
 import { UserHistorySnapshot } from '@prisma/client';
 import { startOfDay, subWeeks } from 'date-fns';
 import { sampleUserHistory } from './sample-data/user-sample';
-import chalk from 'chalk';
+const chalk = require('chalk');
 
 @Injectable()
 export class UserService implements OnModuleInit, OnModuleDestroy {

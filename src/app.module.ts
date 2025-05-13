@@ -7,6 +7,8 @@ import { SnakeWaysBaseModule } from './snake-ways/snake-ways-base.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { WanController } from './wan/wan.controller';
+import { WanService } from './wan/wan.service';
+import { WanModule } from './wan/wan.module';
 
 @Module({
   imports: [
@@ -17,10 +19,10 @@ import { WanController } from './wan/wan.controller';
     SnakeWaysBaseModule,
     DashboardModule,
     ScheduleModule.forRoot(),
+    WanModule,
   ],
 
   // Applied the JwtAuthGuard to the all routes, no longer need to apply it to each route individually (e.g., @UseGuards(JwtAuthGuard))
-  providers: [],
 
   controllers: [WanController],
 })

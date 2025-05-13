@@ -6,7 +6,6 @@ import { SnakeWaysBaseService } from '../snake-ways-base.service';
 import { ApiProperty } from '@nestjs/swagger';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import chalk from 'chalk';
 import { Subscription } from 'rxjs';
 import { Observable } from 'rxjs';
 import {
@@ -18,6 +17,7 @@ import {
   UsageLimitStatus as PrismaUsageLimitStatus,
 } from '@prisma/client';
 import { WanEntity } from 'src/wan/entities/wan.entity';
+const chalk = require('chalk');
 /**
  * Enum for prepaid usage settings
  */
