@@ -15,12 +15,10 @@ import {
   User as PrismaUser,
   UserAccessLevel as PrismaUserAccessLevel,
 } from '@prisma/client';
-import * as chalkModule from 'chalk';
 import { UserEntity } from '../../user/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 import { startOfDay } from 'date-fns';
-
-const chalk = chalkModule.default || chalkModule;
+const chalk = require('chalk');
 
 /**
  * Enum for user access levels

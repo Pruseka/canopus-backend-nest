@@ -7,12 +7,11 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SnakeWaysUserService } from 'src/snake-ways/user/snake-ways-user.service';
 import { UserEntity } from './entities/user.entity';
-import * as chalkModule from 'chalk';
+
 import { UserHistorySnapshot } from '@prisma/client';
 import { startOfDay, subWeeks } from 'date-fns';
 import { sampleUserHistory } from './sample-data/user-sample';
-
-const chalk = chalkModule.default || chalkModule;
+import chalk from 'chalk';
 
 @Injectable()
 export class UserService implements OnModuleInit, OnModuleDestroy {
