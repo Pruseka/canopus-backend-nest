@@ -74,6 +74,23 @@ model Wan {
   usagePeriodInDays      Int?
   usagePeriodType        UsagePeriodType?
   usageStart             DateTime?
+  usageRecords           WanUsage[]
+}
+
+model WanUsage {
+  id           String    @id @default(cuid())
+  wanId        String
+  wan          Wan       @relation(fields: [wanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  bytes        BigInt
+  startTime    DateTime
+  endTime      DateTime?
+  maxBytes     BigInt    @default(0)
+  snapshotDate DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([wanId, startTime])
+  @@index([snapshotDate])
 }
 
 enum UserAccessLevel {
