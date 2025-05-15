@@ -10,7 +10,21 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Observable, Subscription } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { differenceInDays, startOfDay, startOfMonth } from 'date-fns';
+import {
+  differenceInDays,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+  subMonths,
+  subWeeks,
+  subHours,
+  startOfHour,
+  endOfHour,
+  endOfDay,
+  endOfMonth,
+} from 'date-fns';
+import { WanUsageEntity } from '../../wan/entities/wan-usage.entity';
 const chalk = require('chalk');
 
 /**
@@ -72,6 +86,21 @@ export class WanUsage {
   WanID: string;
 }
 
+/**
+ * Type for aggregated WAN usage data
+ */
+export interface AggregatedWanUsage {
+  wanId: string;
+  wanName: string;
+  totalBytes: number;
+  maxBytes: number;
+  usagePercentage: number;
+  formattedTotalBytes: string;
+  formattedMaxBytes: string;
+  periodStart: Date;
+  periodEnd: Date;
+}
+
 @Injectable()
 export class SnakeWaysWanUsageService
   extends SnakeWaysBaseService
@@ -110,7 +139,7 @@ export class SnakeWaysWanUsageService
    * Initialize polling when module starts
    */
   async onModuleInit() {
-    this.startPollingWanUsage();
+    // this.startPollingWanUsage();
   }
 
   /**
@@ -221,31 +250,25 @@ export class SnakeWaysWanUsageService
         }
 
         // Check if we already have a snapshot for this WAN today
-        const existingSnapshot =
-          await this.prismaService.wanUsageSnapshot.findFirst({
-            where: {
-              wanId: wan.id,
-              snapshotDate: {
-                gte: startOfToday,
-              },
+        const existingSnapshot = await this.prismaService.wanUsage.findFirst({
+          where: {
+            wanId: wan.id,
+            snapshotDate: {
+              gte: startOfToday,
             },
-          });
+          },
+        });
 
-        const bytesUsed = BigInt(usageData.Bytes);
-        const maxBytes = BigInt(usageData.MaxBytes);
+        // Transform the data for database operations
+        const { createData, updateData } = this.transformToPrismaWanUsage(
+          usageData,
+          wan.id,
+        );
 
         if (!existingSnapshot) {
           // Create a new snapshot
-          await this.prismaService.wanUsageSnapshot.create({
-            data: {
-              wanId: wan.id,
-              snapshotDate: today,
-              bytesUsed,
-              maxBytes,
-              wanName: usageData.Name,
-              originalStartTime: BigInt(usageData.Starttime),
-              originalEndTime: BigInt(usageData.Endtime),
-            },
+          await this.prismaService.wanUsage.create({
+            data: createData,
           });
 
           this.logger.log(
@@ -255,20 +278,13 @@ export class SnakeWaysWanUsageService
           );
         } else {
           // Update the existing snapshot
-          await this.prismaService.wanUsageSnapshot.update({
+          await this.prismaService.wanUsage.update({
             where: { id: existingSnapshot.id },
-            data: {
-              bytesUsed,
-              maxBytes,
-              wanName: usageData.Name,
-              originalStartTime: BigInt(usageData.Starttime),
-              originalEndTime: BigInt(usageData.Endtime),
-              updatedAt: today,
-            },
+            data: updateData,
           });
 
           this.logger.log(
-            chalk.green.bold(
+            chalk.green(
               `Updated WAN usage snapshot for ${usageData.Name} (${usageData.WanID})`,
             ),
           );
@@ -284,6 +300,50 @@ export class SnakeWaysWanUsageService
         error,
       );
     }
+  }
+
+  /**
+   * Transform Snake Ways WAN usage to Prisma WAN usage schema
+   * @param usageData The WAN usage data from Snake Ways
+   * @param wanId The WAN ID in our database
+   * @returns Object containing data for create and update operations
+   */
+  private transformToPrismaWanUsage(usageData: WanUsage, wanId: string) {
+    // Convert bytes to BigInt
+    const bytes = BigInt(usageData.Bytes);
+    const maxBytes = BigInt(usageData.MaxBytes);
+
+    // Convert timestamps to Date objects
+    const startTime = usageData.Starttime
+      ? new Date(usageData.Starttime * 1000)
+      : new Date();
+
+    // If Endtime is 0, the record is active (no end time)
+    const endTime =
+      usageData.Endtime > 0 ? new Date(usageData.Endtime * 1000) : null;
+
+    const today = new Date();
+
+    // Create data for create operation
+    const createData = {
+      wanId,
+      snapshotDate: today,
+      bytes,
+      maxBytes,
+      startTime,
+      endTime,
+    };
+
+    // Create data for update operation
+    const updateData = {
+      bytes,
+      maxBytes,
+      startTime,
+      endTime,
+      updatedAt: today,
+    };
+
+    return { createData, updateData };
   }
 
   /**
@@ -359,6 +419,223 @@ export class SnakeWaysWanUsageService
     } catch (error) {
       this.logger.error(chalk.red.bold('Force sync failed'), error);
       throw new Error(`Force synchronization failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Transforms Snake Ways WAN usage data to WanUsageEntity objects for API responses
+   * @param wanUsageData The WAN usage data from Snake Ways
+   * @returns Array of WanUsageEntity objects
+   */
+  transformToWanUsageEntities(wanUsageData: WanUsage[]): WanUsageEntity[] {
+    const wanUsageEntities: WanUsageEntity[] = [];
+
+    for (const usageData of wanUsageData) {
+      const startTime = usageData.Starttime
+        ? new Date(usageData.Starttime * 1000)
+        : new Date();
+
+      const endTime =
+        usageData.Endtime > 0 ? new Date(usageData.Endtime * 1000) : null;
+
+      const bytes = BigInt(usageData.Bytes);
+      const maxBytes = BigInt(usageData.MaxBytes);
+
+      // Create a WanUsageEntity instance with constructor
+      const wanUsageEntity = new WanUsageEntity({
+        id: `temp-${usageData.WanID}-${usageData.Starttime}`, // Temporary ID until saved to database
+        wanId: usageData.WanID,
+        wanName: usageData.Name, // Include the WAN name from the API response
+        bytes,
+        maxBytes,
+        startTime,
+        endTime,
+        snapshotDate: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      wanUsageEntities.push(wanUsageEntity);
+    }
+
+    return wanUsageEntities;
+  }
+
+  /**
+   * Get WAN usage entities from the database with filtering options
+   * @param options Filter options for WAN usage
+   * @returns Array of WanUsageEntity objects
+   */
+  async getWanUsageEntities(options?: {
+    wanId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<WanUsageEntity[]> {
+    try {
+      const { wanId, startDate, endDate, limit = 100 } = options || {};
+
+      // Build where clause for filtering
+      const where: any = {};
+
+      if (wanId) {
+        where.wanId = wanId;
+      }
+
+      if (startDate || endDate) {
+        where.snapshotDate = {};
+
+        if (startDate) {
+          where.snapshotDate.gte = startDate;
+        }
+
+        if (endDate) {
+          where.snapshotDate.lte = endDate;
+        }
+      }
+
+      // Get WAN usage records from database
+      const wanUsageRecords = await this.prismaService.wanUsage.findMany({
+        where,
+        orderBy: {
+          snapshotDate: 'desc',
+        },
+        take: limit,
+        include: {
+          wan: {
+            select: {
+              wanName: true,
+            },
+          },
+        },
+      });
+
+      // Transform to entities
+      return wanUsageRecords.map(
+        (record) =>
+          new WanUsageEntity({
+            ...record,
+            wanName: record.wan?.wanName,
+          }),
+      );
+    } catch (error) {
+      this.logger.error(chalk.red('Failed to get WAN usage entities'), error);
+      throw new Error(`Failed to get WAN usage entities: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get aggregated WAN usage data for reporting
+   * @param period The period type for aggregation (daily, weekly, monthly)
+   * @param wanIds Optional array of WAN IDs to filter by
+   * @returns Aggregated WAN usage data
+   */
+  async getAggregatedWanUsage(
+    period: 'daily' | 'weekly' | 'monthly',
+    wanIds?: string[],
+  ): Promise<AggregatedWanUsage[]> {
+    try {
+      const now = new Date();
+      let startDate: Date;
+
+      // Determine the start date based on the period
+      switch (period) {
+        case 'daily':
+          startDate = startOfDay(now);
+          break;
+        case 'weekly':
+          startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
+          break;
+        case 'monthly':
+          startDate = startOfMonth(now);
+          break;
+        default:
+          startDate = startOfDay(now);
+      }
+
+      // Build where clause for filtering
+      const where: any = {
+        snapshotDate: {
+          gte: startDate,
+        },
+      };
+
+      if (wanIds && wanIds.length > 0) {
+        where.wanId = {
+          in: wanIds,
+        };
+      }
+
+      // Get WAN usage records from database
+      const wanUsageRecords = await this.prismaService.wanUsage.findMany({
+        where,
+        include: {
+          wan: {
+            select: {
+              wanName: true,
+            },
+          },
+        },
+      });
+
+      // Group by WAN ID
+      const groupedByWan: Record<string, any[]> = {};
+
+      for (const record of wanUsageRecords) {
+        if (!groupedByWan[record.wanId]) {
+          groupedByWan[record.wanId] = [];
+        }
+
+        groupedByWan[record.wanId].push(record);
+      }
+
+      // Calculate aggregated values for each WAN
+      const result: AggregatedWanUsage[] = [];
+
+      for (const [wanId, records] of Object.entries(groupedByWan)) {
+        // Sort records by snapshot date
+        records.sort(
+          (a, b) => a.snapshotDate.getTime() - b.snapshotDate.getTime(),
+        );
+
+        // Get the first and last record for this period
+        const firstRecord = records[0];
+        const lastRecord = records[records.length - 1];
+
+        // Calculate total bytes used in this period
+        // We use the difference between the last and first record
+        const totalBytes = Number(lastRecord.bytes) - Number(firstRecord.bytes);
+        const maxBytes = Number(lastRecord.maxBytes);
+        const usagePercentage =
+          maxBytes > 0 ? (totalBytes / maxBytes) * 100 : 0;
+
+        // Format bytes for display
+        const formatBytes = (bytes: number): string => {
+          if (bytes === 0) return '0 Bytes';
+          const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
+          const i = Math.floor(Math.log(bytes) / Math.log(1024));
+          return (
+            parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i]
+          );
+        };
+
+        result.push({
+          wanId,
+          wanName: firstRecord.wan?.wanName || 'Unknown WAN',
+          totalBytes,
+          maxBytes,
+          usagePercentage,
+          formattedTotalBytes: formatBytes(totalBytes),
+          formattedMaxBytes: formatBytes(maxBytes),
+          periodStart: firstRecord.snapshotDate,
+          periodEnd: lastRecord.snapshotDate,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(chalk.red('Failed to get aggregated WAN usage'), error);
+      throw new Error(`Failed to get aggregated WAN usage: ${error.message}`);
     }
   }
 
