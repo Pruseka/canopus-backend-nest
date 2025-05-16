@@ -8,13 +8,10 @@ import {
   endOfDay,
   endOfMonth,
   startOfDay,
-  startOfHour,
   startOfMonth,
   subDays,
   subMonths,
 } from 'date-fns';
-import { subHours } from 'date-fns';
-import { endOfHour } from 'date-fns';
 import { PrismaService } from 'src/prisma/prisma.service';
 const chalk = require('chalk');
 
@@ -47,7 +44,9 @@ export class WanUsageService {
   ) {}
 
   /**
-   * Get WAN usage entities with filtering options
+   * Get WAN usage entities from the database with filtering options
+   * @param options Filter options for WAN usage
+   * @returns Array of WanUsageEntity objects
    */
   async getWanUsageEntities(options?: {
     wanId?: string;
@@ -55,8 +54,56 @@ export class WanUsageService {
     endDate?: Date;
     limit?: number;
   }): Promise<WanUsageEntity[]> {
-    this.logger.debug('Getting WAN usage entities with options:', options);
-    return this.snakeWaysWanUsageService.getWanUsageEntities(options);
+    try {
+      const { wanId, startDate, endDate, limit = 100 } = options || {};
+
+      // Build where clause for filtering
+      const where: any = {};
+
+      if (wanId) {
+        where.wanId = wanId;
+      }
+
+      if (startDate || endDate) {
+        where.snapshotDate = {};
+
+        if (startDate) {
+          where.snapshotDate.gte = startDate;
+        }
+
+        if (endDate) {
+          where.snapshotDate.lte = endDate;
+        }
+      }
+
+      // Get WAN usage records from database
+      const wanUsageRecords = await this.prismaService.wanUsage.findMany({
+        where,
+        orderBy: {
+          snapshotDate: 'desc',
+        },
+        take: limit,
+        include: {
+          wan: {
+            select: {
+              wanName: true,
+            },
+          },
+        },
+      });
+
+      // Transform to entities
+      return wanUsageRecords.map(
+        (record) =>
+          new WanUsageEntity({
+            ...record,
+            wanName: record.wan?.wanName,
+          }),
+      );
+    } catch (error) {
+      this.logger.error(chalk.red('Failed to get WAN usage entities'), error);
+      throw new Error(`Failed to get WAN usage entities: ${error.message}`);
+    }
   }
 
   /**

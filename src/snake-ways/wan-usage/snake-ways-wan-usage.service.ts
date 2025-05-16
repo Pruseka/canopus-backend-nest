@@ -462,69 +462,6 @@ export class SnakeWaysWanUsageService
   }
 
   /**
-   * Get WAN usage entities from the database with filtering options
-   * @param options Filter options for WAN usage
-   * @returns Array of WanUsageEntity objects
-   */
-  async getWanUsageEntities(options?: {
-    wanId?: string;
-    startDate?: Date;
-    endDate?: Date;
-    limit?: number;
-  }): Promise<WanUsageEntity[]> {
-    try {
-      const { wanId, startDate, endDate, limit = 100 } = options || {};
-
-      // Build where clause for filtering
-      const where: any = {};
-
-      if (wanId) {
-        where.wanId = wanId;
-      }
-
-      if (startDate || endDate) {
-        where.snapshotDate = {};
-
-        if (startDate) {
-          where.snapshotDate.gte = startDate;
-        }
-
-        if (endDate) {
-          where.snapshotDate.lte = endDate;
-        }
-      }
-
-      // Get WAN usage records from database
-      const wanUsageRecords = await this.prismaService.wanUsage.findMany({
-        where,
-        orderBy: {
-          snapshotDate: 'desc',
-        },
-        take: limit,
-        include: {
-          wan: {
-            select: {
-              wanName: true,
-            },
-          },
-        },
-      });
-
-      // Transform to entities
-      return wanUsageRecords.map(
-        (record) =>
-          new WanUsageEntity({
-            ...record,
-            wanName: record.wan?.wanName,
-          }),
-      );
-    } catch (error) {
-      this.logger.error(chalk.red('Failed to get WAN usage entities'), error);
-      throw new Error(`Failed to get WAN usage entities: ${error.message}`);
-    }
-  }
-
-  /**
    * Get aggregated WAN usage data for reporting
    * @param period The period type for aggregation (daily, weekly, monthly)
    * @param wanIds Optional array of WAN IDs to filter by
