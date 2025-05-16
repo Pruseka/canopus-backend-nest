@@ -46,55 +46,67 @@ VALUES (uuid_generate_v4(), '979FC0CE166A11EDA4F51737CD617E52', 5224000000, '202
 
 -- VSAT
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 8048000000, NOW(), NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 7848000000, '2025-05-15 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 7648000000, '2025-05-13 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 7448000000, '2025-05-11 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 7248000000, '2025-05-09 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 7048000000, '2025-05-07 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 6848000000, '2025-05-05 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 6648000000, '2025-05-03 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 6448000000, '2025-05-01 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 6248000000, '2025-04-29 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 6048000000, '2025-04-27 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 5848000000, '2025-04-25 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 5648000000, '2025-04-23 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 5448000000, '2025-04-21 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 5248000000, '2025-04-19 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 5048000000, '2025-04-17 00:00:00', NOW(), NOW());
 
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
-VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 2048000000, NOW(), NOW(), NOW());
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 4848000000, '2025-04-15 00:00:00', NOW(), NOW());
+
+INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 4648000000, '2025-04-13 00:00:00', NOW(), NOW());
+
+INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 4448000000, '2025-04-11 00:00:00', NOW(), NOW());
+
+INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
+VALUES (uuid_generate_v4(), 'FCF62321165611EDA56E193DE7CF5745', 4248000000, '2025-04-09 00:00:00', NOW(), NOW());
+
+
+
 -- IRIDIUM
 INSERT INTO "WanUsage" ("id", "wanId", "bytes", "snapshotDate", "createdAt", "updatedAt") 
 VALUES (uuid_generate_v4(), 'FCF76E57165611EDA56E193DE7CF5745', 3072000000, NOW(), NOW(), NOW());
