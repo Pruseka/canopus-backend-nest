@@ -75,6 +75,51 @@ model Wan {
   usagePeriodType        UsagePeriodType?
   usageStart             DateTime?
   usageRecords           WanUsage[]
+  lanUsageRecords        LanUsage[]
+}
+
+model Lan {
+  id            String         @id @default(cuid())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lanId         String         @unique
+  lanName       String
+  interfaces    LanInterface[]
+  ipAddress     String
+  subnetmask    String
+  dns1          String?
+  dns2          String?
+  dhcp          LanDhcpStatus  @default(ENABLED)
+  dhcpRangeFrom String?
+  dhcpRangeTo   String?
+  allowGateway  Boolean        @default(true)
+  captivePortal Boolean        @default(false)
+  qos           LanQosLevel    @default(MEDIUM)
+  usageRecords  LanUsage[]
+}
+
+model LanInterface {
+  id          String   @id @default(cuid())
+  lanId       String
+  lan         Lan      @relation(fields: [lanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  interfaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Make relationship optional by removing the reference
+  @@index([interfaceId])
+}
+
+model NetworkInterface {
+  id          String        @id @default(cuid())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  interfaceId String        @unique
+  name        String
+  status      Int // 0=interface down, >0=interface speed
+  type        InterfaceType
+  port        Int
+  vlanId      Int           @default(0)
 }
 
 model WanUsage {
@@ -89,6 +134,24 @@ model WanUsage {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  @@index([wanId, startTime])
+  @@index([snapshotDate])
+}
+
+model LanUsage {
+  id           String    @id @default(cuid())
+  lanId        String
+  lan          Lan       @relation(fields: [lanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  wanId        String
+  wan          Wan       @relation(fields: [wanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  bytes        BigInt
+  startTime    DateTime
+  endTime      DateTime?
+  snapshotDate DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([lanId, startTime])
   @@index([wanId, startTime])
   @@index([snapshotDate])
 }
@@ -139,4 +202,24 @@ enum UsageLimitStatus {
   NO_LIMIT
   LIMIT_ENFORCED
   LIMIT_DISABLED
+}
+
+enum LanDhcpStatus {
+  ENABLED
+  DISABLED
+}
+
+enum LanQosLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum InterfaceType {
+  ETHERNET // 0
+  WIFI_AP // 1
+  WIFI_MANAGED // 2
+  LTE // 6
+  LINK_EXTENDER // 7
+  EXTENDER // 8
 }

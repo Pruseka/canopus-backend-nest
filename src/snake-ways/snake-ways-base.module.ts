@@ -7,6 +7,9 @@ import { SnakeWaysUserService } from './user/snake-ways-user.service';
 import * as https from 'https';
 import { SnakeWaysWanService } from './wan/snake-ways-wan.service';
 import { SnakeWaysWanUsageService } from './wan-usage/snake-ways-wan-usage.service';
+import { SnakeWaysLanService } from './lan/snake-ways-lan.service';
+import { SnakeWaysInterfaceService } from './interface/snake-ways-interface.service';
+import { SnakeWaysLanUsageService } from './lan-usage/snake-ways-lan-usage.service';
 
 @Module({
   imports: [
@@ -34,12 +37,18 @@ import { SnakeWaysWanUsageService } from './wan-usage/snake-ways-wan-usage.servi
     SnakeWaysUserService,
     SnakeWaysWanService,
     SnakeWaysWanUsageService,
+    SnakeWaysLanService,
+    SnakeWaysInterfaceService,
+    SnakeWaysLanUsageService,
   ],
   exports: [
     SnakeWaysBaseService,
     SnakeWaysUserService,
     SnakeWaysWanService,
     SnakeWaysWanUsageService,
+    SnakeWaysLanService,
+    SnakeWaysInterfaceService,
+    SnakeWaysLanUsageService,
   ],
 })
 export class SnakeWaysBaseModule {}
