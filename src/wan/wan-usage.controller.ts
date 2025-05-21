@@ -5,20 +5,12 @@ import {
   Param,
   ParseArrayPipe,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '../auth/enums/role.enum';
 import { AggregatedWanUsage } from '../snake-ways/wan-usage/snake-ways-wan-usage.service';
+import { WanUsageChartResponseDto } from './dto';
 import { WanUsageEntity } from './entities/wan-usage.entity';
-import {
-  WanChartMetadata,
-  WanUsageChartData,
-  WanUsageService,
-} from './wan-usage.service';
+import { WanUsageService } from './wan-usage.service';
 
 @ApiTags('wan-usage')
 @Controller('wan-usage')
@@ -67,7 +59,7 @@ export class WanUsageController {
   @ApiResponse({
     status: 200,
     description: 'Returns WAN usage chart data',
-    type: [Object],
+    type: WanUsageChartResponseDto,
   })
   async getWanUsageChartData(
     @Param('period') period: 'daily' | 'weekly' | 'monthly',
@@ -76,13 +68,14 @@ export class WanUsageController {
       new ParseArrayPipe({ items: String, separator: ',', optional: true }),
     )
     wanIds?: string[],
-  ): Promise<{ data: WanUsageChartData[]; metadata: WanChartMetadata[] }> {
+  ): Promise<WanUsageChartResponseDto> {
     this.logger.log(
       `Getting ${period} chart data for WANs: ${wanIds?.join(', ') || 'all'}`,
     );
     return this.wanUsageService.getWanUsageChartData(period, wanIds);
   }
 
+  //! Unused in the UI
   @Get('aggregated/:period')
   //   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Get aggregated WAN usage data' })

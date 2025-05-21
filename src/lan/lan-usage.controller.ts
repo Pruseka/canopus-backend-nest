@@ -7,7 +7,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { LanUsageEntity } from './entities/lan-usage.entity';
 import { LanUsageService, LanWithUsage } from './lan-usage.service';
 import { LanUsageQueryDto, LanWithUsageDto, LanWithUsageQueryDto } from './dto';
@@ -47,6 +47,12 @@ export class LanUsageController {
     status: 200,
     description: 'Returns LANs with their usage data',
     type: [LanWithUsageDto],
+  })
+  @ApiQuery({
+    name: 'query',
+    required: false,
+    type: LanWithUsageQueryDto,
+    description: 'Filter by WAN ID',
   })
   async getLansWithUsage(
     @Query() query: LanWithUsageQueryDto,

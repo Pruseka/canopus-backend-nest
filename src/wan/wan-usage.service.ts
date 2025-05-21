@@ -1,10 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  SnakeWaysWanUsageService,
-  AggregatedWanUsage,
-} from '../snake-ways/wan-usage/snake-ways-wan-usage.service';
-import { WanUsageEntity } from './entities/wan-usage.entity';
-import {
   endOfDay,
   endOfMonth,
   startOfDay,
@@ -13,26 +8,17 @@ import {
   subMonths,
 } from 'date-fns';
 import { PrismaService } from 'src/prisma/prisma.service';
+import {
+  AggregatedWanUsage,
+  SnakeWaysWanUsageService,
+} from '../snake-ways/wan-usage/snake-ways-wan-usage.service';
+import {
+  WanChartMetadataDto,
+  WanUsageChartDataDto,
+  WanUsageChartResponseDto,
+} from './dto';
+import { WanUsageEntity } from './entities/wan-usage.entity';
 const chalk = require('chalk');
-
-/**
- * Type for chart data point
- */
-export interface WanUsageChartData {
-  date: Date;
-  // Dynamic keys for each WAN name with usage values
-  [wanName: string]: Date | number;
-}
-
-/**
- * Type for metadata about each WAN in the chart
- */
-export interface WanChartMetadata {
-  name: string;
-  totalBytes: number;
-  formattedTotalBytes: string;
-  color?: string; // Optional color for the chart
-}
 
 @Injectable()
 export class WanUsageService {
@@ -115,7 +101,7 @@ export class WanUsageService {
   async getWanUsageChartData(
     period: 'daily' | 'weekly' | 'monthly',
     wanIds?: string[],
-  ): Promise<{ data: WanUsageChartData[]; metadata: WanChartMetadata[] }> {
+  ): Promise<WanUsageChartResponseDto> {
     try {
       const now = new Date();
       let startDate: Date;
@@ -191,7 +177,7 @@ export class WanUsageService {
         groupedByWan[record.wanId].push(record);
       }
 
-      // Initialize data points based on the period
+      // Initialize time points based on the period
       const timePoints: Date[] = [];
 
       // Generate time points based on the period
@@ -235,12 +221,12 @@ export class WanUsageService {
       }
 
       // Initialize chart data with dates
-      const chartData: WanUsageChartData[] = timePoints.map((date) => ({
+      const chartData: WanUsageChartDataDto[] = timePoints.map((date) => ({
         date,
       }));
 
       // Initialize metadata for each WAN
-      const metadata: WanChartMetadata[] = [];
+      const metadata: WanChartMetadataDto[] = [];
 
       // Process all WANs in wanNames
       for (const [wanId, wanName] of Object.entries(wanNames)) {
@@ -319,7 +305,12 @@ export class WanUsageService {
         });
       }
 
-      return { data: chartData, metadata };
+      const response: WanUsageChartResponseDto = {
+        data: chartData,
+        metadata: metadata,
+      };
+
+      return response;
     } catch (error) {
       this.logger.error(chalk.red('Failed to get WAN usage chart data'), error);
       throw new Error(`Failed to get WAN usage chart data: ${error.message}`);
