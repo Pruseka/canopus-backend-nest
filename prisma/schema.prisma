@@ -14,10 +14,212 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String                @id @default(cuid())
+  email               String                @unique
+  name                String?
+  password            String
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  refreshToken        String?
+  accessLevel         UserAccessLevel       @default(USER)
+  autoCredit          Boolean               @default(false)
+  dataCredit          BigInt                @default(0)
+  displayName         String?
+  status              Status                @default(REGISTERED)
+  portalConnectedAt   DateTime?
+  timeCredit          BigInt                @default(0)
+  UserHistorySnapshot UserHistorySnapshot[]
+}
+
+model UserHistorySnapshot {
+  id                String          @id @default(cuid())
+  userId            String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  snapshotDate      DateTime        @default(now())
+  accessLevel       UserAccessLevel @default(USER)
+  autoCredit        Boolean         @default(false)
+  dataCredit        BigInt          @default(0)
+  name              String?
+  displayName       String?
+  status            Status          @default(REGISTERED)
+  portalConnectedAt DateTime?
+  timeCredit        BigInt          @default(0)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, snapshotDate])
+}
+
+model Wan {
+  id                     String           @id @default(cuid())
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  wanName                String
+  wanStatus              WanStatus
+  prepaidUsageMode       PrepaidUsageMode @default(ALLOW)
+  dhcp                   DhcpStatus       @default(ENABLED)
+  dns1                   String?
+  dns2                   String?
+  interfaceId            String?
+  ipAddress              String?
+  ipGateway              String?
+  prepaidUsageMaxVolume  BigInt?
+  prepaidUsagePeriodType UsagePeriodType?
+  subnetmask             String?
+  switchPriority         Int?
+  usageBlocked           BigInt           @default(0)
+  usageInBytes           BigInt           @default(0)
+  usageLimitStatus       UsageLimitStatus @default(NO_LIMIT)
+  maxUsageInBytes        BigInt?
+  usagePeriodInDays      Int?
+  usagePeriodType        UsagePeriodType?
+  usageStart             DateTime?
+  usageRecords           WanUsage[]
+  lanUsageRecords        LanUsage[]
+}
+
+model Lan {
+  id            String         @id @default(cuid())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lanId         String         @unique
+  lanName       String
+  interfaces    LanInterface[]
+  ipAddress     String
+  subnetmask    String
+  dns1          String?
+  dns2          String?
+  dhcp          LanDhcpStatus  @default(ENABLED)
+  dhcpRangeFrom String?
+  dhcpRangeTo   String?
+  allowGateway  Boolean        @default(true)
+  captivePortal Boolean        @default(false)
+  qos           LanQosLevel    @default(MEDIUM)
+  usageRecords  LanUsage[]
+}
+
+model LanInterface {
+  id          String   @id @default(cuid())
+  lanId       String
+  lan         Lan      @relation(fields: [lanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  interfaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Make relationship optional by removing the reference
+  @@index([interfaceId])
+}
+
+model NetworkInterface {
+  id          String        @id @default(cuid())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  interfaceId String        @unique
+  name        String
+  status      Int // 0=interface down, >0=interface speed
+  type        InterfaceType
+  port        Int
+  vlanId      Int           @default(0)
+}
+
+model WanUsage {
+  id           String    @id @default(cuid())
+  wanId        String
+  wan          Wan       @relation(fields: [wanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  bytes        BigInt
+  startTime    DateTime
+  endTime      DateTime?
+  maxBytes     BigInt    @default(0)
+  snapshotDate DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([wanId, startTime])
+  @@index([snapshotDate])
+}
+
+model LanUsage {
+  id           String    @id @default(cuid())
+  lanId        String
+  lan          Lan       @relation(fields: [lanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  wanId        String
+  wan          Wan       @relation(fields: [wanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  bytes        BigInt
+  startTime    DateTime
+  endTime      DateTime?
+  snapshotDate DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([lanId, startTime])
+  @@index([wanId, startTime])
+  @@index([snapshotDate])
+}
+
+enum UserAccessLevel {
+  ADMIN
+  SITE_ADMIN
+  SITE_MASTER
+  USER
+  PREPAID_USER
+}
+
+enum Status {
+  PENDING
+  ERROR
+  REGISTERED
+}
+
+enum WanStatus {
+  READY
+  ERROR
+  SUSPENDED
+  INITIALIZING
+  ALL_WAN_FORCED_OFF
+  NOT_READY
+  QUOTA_REACHED
+  ONLINE
+}
+
+enum PrepaidUsageMode {
+  DISALLOW
+  ALLOW
+  LIMITED
+}
+
+enum DhcpStatus {
+  ENABLED
+  DISABLED
+}
+
+enum UsagePeriodType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum UsageLimitStatus {
+  NO_LIMIT
+  LIMIT_ENFORCED
+  LIMIT_DISABLED
+}
+
+enum LanDhcpStatus {
+  ENABLED
+  DISABLED
+}
+
+enum LanQosLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum InterfaceType {
+  ETHERNET // 0
+  WIFI_AP // 1
+  WIFI_MANAGED // 2
+  LTE // 6
+  LINK_EXTENDER // 7
+  EXTENDER // 8
 }

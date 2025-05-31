@@ -1,0 +1,14 @@
+-- CreateEnum
+CREATE TYPE "UserAccessLevel" AS ENUM ('ADMIN', 'SITE_ADMIN', 'SITE_MASTER', 'USER', 'PREPAID_USER');
+
+-- CreateEnum
+CREATE TYPE "Pending" AS ENUM ('PENDING', 'ERROR', 'REGISTERED');
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "accessLevel" "UserAccessLevel" NOT NULL DEFAULT 'USER',
+ADD COLUMN     "autoCredit" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "dataCredit" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "displayName" TEXT,
+ADD COLUMN     "pending" "Pending" NOT NULL DEFAULT 'REGISTERED',
+ADD COLUMN     "portalConnectedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "timeCredit" INTEGER NOT NULL DEFAULT 0;
