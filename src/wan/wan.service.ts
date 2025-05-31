@@ -7,6 +7,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SnakeWaysWanService } from 'src/snake-ways/wan/snake-ways-wan.service';
 import { WanEntity } from './entities';
+import { SystemRouteResponse } from 'src/snake-ways/wan/dto';
 const chalk = require('chalk');
 
 @Injectable()
@@ -136,6 +137,35 @@ export class WanService implements OnModuleInit, OnModuleDestroy {
         restarted: false,
         message: `Failed to restart WAN service polling: ${error.message}`,
       };
+    }
+  }
+
+  /**
+   * Get current system route status
+   * @returns Current route status information
+   */
+  async getCurrentSystemRoute(): Promise<SystemRouteResponse> {
+    try {
+      this.logger.log(chalk.cyan('Getting current system route status'));
+      return await this.swWanService.getCurrentSystemRoute();
+    } catch (error) {
+      this.logger.error(chalk.red('Error getting current system route'), error);
+      throw error;
+    }
+  }
+
+  /**
+   * Change system route to the specified WAN
+   * @param wanId ID of WAN to be used as system route, "AUTO" for automatic routing, or "OFF" to disable all WAN interfaces
+   * @returns Route status information
+   */
+  async changeSystemRoute(wanId: string): Promise<SystemRouteResponse> {
+    try {
+      this.logger.log(chalk.cyan(`Changing system route to WAN: ${wanId}`));
+      return await this.swWanService.changeSystemRoute(wanId);
+    } catch (error) {
+      this.logger.error(chalk.red('Error changing system route'), error);
+      throw error;
     }
   }
 }

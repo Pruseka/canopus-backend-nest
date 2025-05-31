@@ -8,6 +8,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { SnakeWaysUserService } from 'src/snake-ways/user/snake-ways-user.service';
 import { UserEntity } from './entities/user.entity';
 import { UserHistorySnapshotEntity } from './entities/user-history-snapshot.entity';
+import { startOfDay, endOfDay } from 'date-fns';
 const chalk = require('chalk');
 
 @Injectable()
@@ -101,8 +102,8 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Get history snapshots for all users within a date range
-   * @param startDate Optional start date to filter snapshots, defaults to today
-   * @param endDate Optional end date to filter snapshots, defaults to one week ago
+   * @param startDate Optional start date to filter snapshots (inclusive - greater than or equal to)
+   * @param endDate Optional end date to filter snapshots (inclusive - less than or equal to)
    * @returns Array of UserHistorySnapshot objects
    */
   async getHistory(
@@ -110,18 +111,26 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
     endDate?: Date,
   ): Promise<UserHistorySnapshotEntity[] | null> {
     try {
+      const whereClause: any = {};
+
+      // Build date filters independently
+      if (startDate || endDate) {
+        whereClause.snapshotDate = {};
+
+        if (startDate) {
+          // Include from start of the startDate (00:00:00)
+          whereClause.snapshotDate.gte = startOfDay(startDate);
+        }
+
+        if (endDate) {
+          // Include until end of the endDate (23:59:59.999)
+          whereClause.snapshotDate.lte = endOfDay(endDate);
+        }
+      }
+
       const dbSnapshots = await this.prisma.userHistorySnapshot.findMany({
-        where: {
-          ...(startDate && endDate
-            ? {
-                snapshotDate: {
-                  gte: startDate,
-                  lte: endDate,
-                },
-              }
-            : {}),
-        },
-        orderBy: { snapshotDate: 'desc' },
+        where: whereClause,
+        orderBy: { name: 'asc' },
       });
 
       this.logger.log(
@@ -143,8 +152,8 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
   /**
    * Get user history snapshots for a specific user
    * @param userId The ID of the user to get history for
-   * @param startDate Optional start date to filter snapshots, defaults to today
-   * @param endDate Optional end date to filter snapshots, defaults to one week ago
+   * @param startDate Optional start date to filter snapshots (inclusive - greater than or equal to)
+   * @param endDate Optional end date to filter snapshots (inclusive - less than or equal to)
    * @returns Array of UserHistorySnapshot objects
    */
   async getUserHistory(
@@ -153,18 +162,25 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
     endDate?: Date,
   ): Promise<UserHistorySnapshotEntity[] | null> {
     try {
+      const whereClause: any = { userId };
+
+      // Build date filters independently
+      if (startDate || endDate) {
+        whereClause.snapshotDate = {};
+
+        if (startDate) {
+          // Include from start of the startDate (00:00:00)
+          whereClause.snapshotDate.gte = startOfDay(startDate);
+        }
+
+        if (endDate) {
+          // Include until end of the endDate (23:59:59.999)
+          whereClause.snapshotDate.lte = endOfDay(endDate);
+        }
+      }
+
       const dbSnapshots = await this.prisma.userHistorySnapshot.findMany({
-        where: {
-          userId,
-          ...(startDate && endDate
-            ? {
-                snapshotDate: {
-                  gte: startDate,
-                  lte: endDate,
-                },
-              }
-            : {}),
-        },
+        where: whereClause,
         orderBy: { snapshotDate: 'desc' },
       });
 

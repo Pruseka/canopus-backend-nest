@@ -186,7 +186,7 @@ export class SnakeWaysUserService
    * Initialize polling when module starts
    */
   async onModuleInit() {
-    // this.startPollingUsers();
+    this.startPollingUsers();
   }
 
   /**

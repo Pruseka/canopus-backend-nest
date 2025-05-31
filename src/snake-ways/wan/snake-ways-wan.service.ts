@@ -17,6 +17,16 @@ import {
   UsageLimitStatus as PrismaUsageLimitStatus,
 } from '@prisma/client';
 import { WanEntity } from 'src/wan/entities/wan.entity';
+import { ChangeSystemRouteDto } from './dto/change-system-route.dto';
+import {
+  SystemRouteResponse,
+  RouteType,
+  RouteStatus,
+  SnakeWaysSystemRouteResponse,
+  SnakeWaysRouteData,
+  SnakeWaysRouteType,
+  SnakeWaysRouteStatus,
+} from './dto/system-route-response.dto';
 const chalk = require('chalk');
 /**
  * Enum for prepaid usage settings
@@ -325,7 +335,7 @@ export class SnakeWaysWanService
   }
 
   async onModuleInit() {
-    // this.startPollingWans();
+    this.startPollingWans();
   }
 
   private startPollingWans() {
@@ -616,6 +626,146 @@ export class SnakeWaysWanService
       this.logger.error(chalk.red.bold('Force sync failed'), error);
       throw new Error(`Force synchronization failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Change system route to the specified WAN
+   * @param wanId ID of WAN to be used as system route, "AUTO" for automatic routing, or "OFF" to disable all WAN interfaces
+   * @returns Route status information
+   */
+  async changeSystemRoute(wanId: string): Promise<SystemRouteResponse> {
+    try {
+      this.logger.log(chalk.blue(`Changing system route to WAN: ${wanId}`));
+
+      const response = await this.put<SnakeWaysSystemRouteResponse>('/route', {
+        WanID: wanId,
+      });
+
+      if (!response) {
+        throw new Error('No response received from Snake Ways');
+      }
+
+      // Log the raw response for debugging
+      this.logger.debug(
+        chalk.cyan(`Raw Snake Ways response: ${JSON.stringify(response)}`),
+      );
+
+      if (
+        !response.route ||
+        !Array.isArray(response.route) ||
+        response.route.length === 0
+      ) {
+        throw new Error(
+          'Invalid response format: route array is missing or empty',
+        );
+      }
+
+      const routeData = response.route[0];
+      const mappedResponse = this.mapSnakeWaysRouteResponse(routeData);
+
+      this.logger.log(
+        chalk.green(
+          `System route changed successfully. Current WAN: ${mappedResponse.wanId}, Status: ${mappedResponse.status}, RouteType: ${mappedResponse.routeType}`,
+        ),
+      );
+
+      return mappedResponse;
+    } catch (error) {
+      this.logger.error('Failed to change system route', error);
+      throw new Error(`Failed to change system route: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get current system route status
+   * @returns Current route status information
+   */
+  async getCurrentSystemRoute(): Promise<SystemRouteResponse> {
+    try {
+      this.logger.log(chalk.blue('Getting current system route status'));
+
+      const response = await this.get<SnakeWaysSystemRouteResponse>('/route');
+
+      if (!response) {
+        throw new Error('No response received from Snake Ways');
+      }
+
+      // Log the raw response for debugging
+      this.logger.debug(
+        chalk.cyan(`Raw Snake Ways response: ${JSON.stringify(response)}`),
+      );
+
+      if (
+        !response.route ||
+        !Array.isArray(response.route) ||
+        response.route.length === 0
+      ) {
+        throw new Error(
+          'Invalid response format: route array is missing or empty',
+        );
+      }
+
+      const routeData = response.route[0];
+      const mappedResponse = this.mapSnakeWaysRouteResponse(routeData);
+
+      this.logger.log(
+        chalk.green(
+          `Current system route: WAN ${mappedResponse.wanId}, Status: ${mappedResponse.status}, RouteType: ${mappedResponse.routeType}`,
+        ),
+      );
+
+      return mappedResponse;
+    } catch (error) {
+      this.logger.error('Failed to get current system route', error);
+      throw new Error(`Failed to get current system route: ${error.message}`);
+    }
+  }
+
+  /**
+   * Map Snake Ways route type to application route type
+   */
+  private mapSnakeWaysRouteType(swRouteType: SnakeWaysRouteType): RouteType {
+    switch (swRouteType) {
+      case SnakeWaysRouteType.AUTOMATIC:
+        return RouteType.AUTOMATIC;
+      case SnakeWaysRouteType.SWITCH_FORCED_TO_WAN:
+        return RouteType.SWITCH_FORCED_TO_WAN;
+      case SnakeWaysRouteType.SWITCH_FORCED_OFF:
+        return RouteType.SWITCH_FORCED_OFF;
+      case SnakeWaysRouteType.LAN_FORCED_TO_WAN:
+        return RouteType.LAN_FORCED_TO_WAN;
+      default:
+        throw new Error(`Unknown Snake Ways route type: ${swRouteType}`);
+    }
+  }
+
+  /**
+   * Map Snake Ways route status to application route status
+   */
+  private mapSnakeWaysRouteStatus(
+    swRouteStatus: SnakeWaysRouteStatus,
+  ): RouteStatus {
+    switch (swRouteStatus) {
+      case SnakeWaysRouteStatus.NO_DEFAULT_ROUTE:
+        return RouteStatus.NO_DEFAULT_ROUTE;
+      case SnakeWaysRouteStatus.DEFAULT_ROUTE_SET:
+        return RouteStatus.DEFAULT_ROUTE_SET;
+      default:
+        throw new Error(`Unknown Snake Ways route status: ${swRouteStatus}`);
+    }
+  }
+
+  /**
+   * Map Snake Ways system route response to application response
+   */
+  private mapSnakeWaysRouteResponse(
+    routeData: SnakeWaysRouteData,
+  ): SystemRouteResponse {
+    return {
+      wanId: routeData.WanID,
+      status: this.mapSnakeWaysRouteStatus(routeData.Status),
+      routeType: this.mapSnakeWaysRouteType(routeData.RouteType),
+    };
   }
 
   onModuleDestroy() {

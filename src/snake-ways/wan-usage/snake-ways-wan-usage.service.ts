@@ -139,7 +139,7 @@ export class SnakeWaysWanUsageService
    * Initialize polling when module starts
    */
   async onModuleInit() {
-    // this.startPollingWanUsage();
+    this.startPollingWanUsage();
   }
 
   /**

@@ -137,7 +137,7 @@ export class SnakeWaysInterfaceService
       interface: InterfaceClass[];
     }>(
       '/interface',
-      this.pollingIntervalInMins * 60000, // Convert minutes to milliseconds
+      this.pollingIntervalInMins * 1000, // Convert minutes to milliseconds
     );
 
     this.interfacePollingSubscription = this.interfaceDataStream$.subscribe({
