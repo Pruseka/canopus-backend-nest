@@ -141,7 +141,7 @@ export class SnakeWaysBaseService {
     try {
       const { data } = await firstValueFrom(
         this.httpService.get<T>(endpoint, config).pipe(
-          timeout(3000),
+          timeout(4000),
           catchError((error: AxiosError) => {
             this.handleError('GET', endpoint, error);
             return of({ data: null as T });
@@ -177,7 +177,7 @@ export class SnakeWaysBaseService {
     try {
       const { data } = await firstValueFrom(
         this.httpService.post<T>(endpoint, payload, config).pipe(
-          timeout(3000),
+          timeout(4000),
           catchError((error: AxiosError) => {
             this.handleError('POST', endpoint, error);
             return of({ data: null as T });
@@ -213,7 +213,7 @@ export class SnakeWaysBaseService {
     try {
       const { data } = await firstValueFrom(
         this.httpService.put<T>(endpoint, payload, config).pipe(
-          timeout(3000),
+          timeout(4000),
           catchError((error: AxiosError) => {
             this.handleError('PUT', endpoint, error);
             return of({ data: null as T });
@@ -248,7 +248,7 @@ export class SnakeWaysBaseService {
     try {
       const { data } = await firstValueFrom(
         this.httpService.delete<T>(endpoint, config).pipe(
-          timeout(3000),
+          timeout(4000),
           catchError((error: AxiosError) => {
             this.handleError('DELETE', endpoint, error);
             return of({ data: null as T });

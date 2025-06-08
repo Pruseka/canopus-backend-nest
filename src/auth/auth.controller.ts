@@ -15,7 +15,7 @@ import { Public } from './decorators';
 import { Response } from 'express';
 import { GetCurrentUser } from './decorators';
 import { ConfigService } from '@nestjs/config';
-import { RefreshTokenGuard } from './guard';
+import { JwtAuthGuard, RefreshTokenGuard } from './guard';
 import { GetCurrentUserId } from './decorators';
 import { ApiResponse } from '@nestjs/swagger';
 import { UserEntity } from 'src/user/entities';
@@ -81,6 +81,13 @@ export class AuthController {
       user: userWithoutPassword,
       error,
     };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('signout')
+  async signOut(@GetCurrentUser() user: UserEntity) {
+    await this.authService.signOut(user.id);
+    return { message: 'Signed out successfully' };
   }
 
   @Public()

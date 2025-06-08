@@ -160,6 +160,10 @@ export class AuthService {
     return { tokens, user: userEntity, error: null };
   }
 
+  async signOut(userId: string): Promise<void> {
+    await this.user.updateRefreshToken(userId, '');
+  }
+
   async signToken(user: User): Promise<{
     tokens: TokensResponseDto;
     user: UserEntity;

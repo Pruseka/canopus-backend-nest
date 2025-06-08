@@ -3,11 +3,11 @@ import { Status, User, UserAccessLevel } from '@prisma/client';
 import { Exclude } from 'class-transformer';
 
 export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
-  constructor(partial: Partial<any>) {
+  constructor(partial: Partial<any> = {}) {
     Object.assign(this, partial);
 
     // Handle bigint conversion for serialization
-    if (partial.dataCredit !== undefined) {
+    if (partial && partial.dataCredit !== undefined) {
       // Handle if it's a bigint
       if (typeof partial.dataCredit === 'bigint') {
         this.dataCredit = Number(partial.dataCredit);
@@ -16,7 +16,7 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
       }
     }
 
-    if (partial.timeCredit !== undefined) {
+    if (partial && partial.timeCredit !== undefined) {
       // Handle if it's a bigint
       if (typeof partial.timeCredit === 'bigint') {
         this.timeCredit = Number(partial.timeCredit);

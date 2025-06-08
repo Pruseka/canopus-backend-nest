@@ -104,7 +104,7 @@ export class UserController {
   })
   @ApiOperation({ summary: 'Get the current user profile' })
   getMe(@Req() req: Request) {
-    return req.user;
+    return req.user || null;
   }
 
   // @UseGuards(JwtAuthGuard)

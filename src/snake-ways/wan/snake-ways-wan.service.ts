@@ -660,6 +660,10 @@ export class SnakeWaysWanService
         );
       }
 
+      // Sync wans with database after changing the system route
+      const wans = await this.getAllWans();
+      await this.syncWansWithDatabase(wans);
+
       const routeData = response.route[0];
       const mappedResponse = this.mapSnakeWaysRouteResponse(routeData);
 

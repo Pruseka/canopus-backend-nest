@@ -1,12 +1,18 @@
-import { Controller, Get, Post, Put, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
 import { WanService } from './wan.service';
 import { WanEntity } from './entities';
 import { UserEntity } from 'src/user/entities';
 import {
   ChangeSystemRouteDto,
+  RouteStatus,
+  RouteType,
   SystemRouteResponse,
 } from 'src/snake-ways/wan/dto';
+import { Roles } from 'src/auth/decorators';
+import { Role } from 'src/auth/enums/role.enum';
+import { JwtAuthGuard, RolesGuard } from 'src/auth/guard';
+import { UserAccessLevel } from '@prisma/client';
 
 @ApiTags('WANS')
 @Controller('wans')
@@ -102,6 +108,8 @@ export class WanController {
     }
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserAccessLevel.ADMIN, UserAccessLevel.SITE_ADMIN)
   @Put('force-switch')
   @ApiBody({ type: ChangeSystemRouteDto })
   @ApiResponse({
@@ -126,7 +134,13 @@ export class WanController {
     @Body() changeRouteDto: ChangeSystemRouteDto,
   ): Promise<SystemRouteResponse> {
     try {
-      return await this.wanService.changeSystemRoute(changeRouteDto.wanId);
+      console.log('changeRouteDto', changeRouteDto);
+      return {
+        wanId: changeRouteDto.wanId,
+        status: RouteStatus.DEFAULT_ROUTE_SET,
+        routeType: RouteType.SWITCH_FORCED_TO_WAN,
+      };
+      // return await this.wanService.changeSystemRoute(changeRouteDto.wanId);
     } catch (error) {
       throw error;
     }
