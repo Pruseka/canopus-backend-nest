@@ -1,0 +1,94 @@
+{
+  "autocredit": [
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "08CEA67DEA9811EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "8B8FB214EA9711EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "A1A1F0E0EA9711EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "AD9CE719EA9711EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "BBF6CD8DEA9711EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "C88CA66CEA9711EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "D44777E4EA9711EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "DEFCF838EA9711EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "EEEA6B28EA9711EFA4B11634BF2372D1"
+    },
+    {
+      "CreditDefinition": 1,
+      "CreditInterval": 1,
+      "CreditType": 2,
+      "CreditValue": 5368709120,
+      "LastTopup": 0,
+      "Status": 1,
+      "UserID": "FC6EEDA0EA9711EFA4B11634BF2372D1"
+    }
+  ]
+}

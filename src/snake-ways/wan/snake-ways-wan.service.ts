@@ -662,6 +662,11 @@ export class SnakeWaysWanService
 
       // Sync wans with database after changing the system route
       const wans = await this.getAllWans();
+      this.logger.log(
+        chalk.cyan(
+          `Retrieved Wans after changing system route: ${JSON.stringify(wans)}`,
+        ),
+      );
       await this.syncWansWithDatabase(wans);
 
       const routeData = response.route[0];

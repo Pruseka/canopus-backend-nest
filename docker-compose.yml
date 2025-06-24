@@ -1,33 +1,142 @@
-version: '3.8'
 services:
+  # PostgreSQL Database
   canopus-dev-db:
-    image: postgres:13
+    image: postgres:13-alpine
+    container_name: canopus-postgres
+    restart: unless-stopped
     ports:
-      - 5434:5432
+      - '5434:5432'
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: canopus
+      POSTGRES_INITDB_ARGS: '--encoding=UTF-8 --lc-collate=C --lc-ctype=C'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ['CMD', 'pg_isready', '-U', 'postgres']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d canopus']
       interval: 10s
+      timeout: 5s
       retries: 5
+      start_period: 30s
+    networks:
+      - canopus-network
 
-  # canopus-api:
-  #   build: .
-  #   restart: always
-  #   depends_on:
-  #     - canopus-dev-db
-  #   ports:
-  #     - '4000:4000'
+  # Canopus API Application
+  canopus-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: canopus-api
+    restart: unless-stopped
+    depends_on:
+      canopus-dev-db:
+        condition: service_healthy
+    ports:
+      - '4000:4000'
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: 'postgresql://postgres:password@canopus-dev-db:5432/canopus'
+      JWT_SECRET: '${JWT_SECRET:-your-super-secure-jwt-secret-key-min-32-chars-for-production}'
+      JWT_REFRESH_SECRET: '${JWT_REFRESH_SECRET:-your-super-secure-refresh-secret-key-min-32-chars-for-production}'
+      SNAKE_WAYS_BASE_URL: '${SNAKE_WAYS_BASE_URL:-http://your-snake-ways-service-url}'
+      SNAKE_WAYS_API_KEY: '${SNAKE_WAYS_API_KEY:-your-snake-ways-api-key}'
+      SNAKE_WAYS_USERNAME: '${SNAKE_WAYS_USERNAME:-your-username}'
+      SNAKE_WAYS_PASSWORD: '${SNAKE_WAYS_PASSWORD:-your-password}'
+      SNAKE_WAYS_USER_POLLING_INTERVAL: '${SNAKE_WAYS_USER_POLLING_INTERVAL:-5}'
+      SNAKE_WAYS_WAN_POLLING_INTERVAL: '${SNAKE_WAYS_WAN_POLLING_INTERVAL:-5}'
+      SNAKE_WAYS_LAN_POLLING_INTERVAL: '${SNAKE_WAYS_LAN_POLLING_INTERVAL:-5}'
+      SNAKE_WAYS_INTERFACE_POLLING_INTERVAL: '${SNAKE_WAYS_INTERFACE_POLLING_INTERVAL:-5}'
+      CORS_ORIGIN: '${CORS_ORIGIN:-http://localhost:3000}'
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:4000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - canopus-network
+    env_file:
+      - .env
 
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     NODE_ENV: production
-  #   command: ['npm', 'run', 'start:prod']
+  # Development-only services
+  canopus-api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: canopus-api-dev
+    restart: unless-stopped
+    depends_on:
+      canopus-dev-db:
+        condition: service_healthy
+    ports:
+      - '4001:4000'
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: 'postgresql://postgres:password@canopus-dev-db:5432/canopus'
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./logs:/app/logs
+    networks:
+      - canopus-network
+    env_file:
+      - .env
+    profiles:
+      - dev
+
+  # Prisma Studio (Development only)
+  prisma-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base
+    container_name: canopus-prisma-studio
+    depends_on:
+      canopus-dev-db:
+        condition: service_healthy
+    ports:
+      - '5555:5555'
+    environment:
+      DATABASE_URL: 'postgresql://postgres:password@canopus-dev-db:5432/canopus'
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command:
+      [
+        'pnpm',
+        'dlx',
+        'prisma',
+        'studio',
+        '--browser',
+        'none',
+        '--port',
+        '5555',
+        '--hostname',
+        '0.0.0.0',
+      ]
+    networks:
+      - canopus-network
+    profiles:
+      - dev
 
 volumes:
   pgdata:
+    driver: local
+
+networks:
+  canopus-network:
+    driver: bridge

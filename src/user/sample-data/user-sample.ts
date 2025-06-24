@@ -1,6 +1,13 @@
 import { UserEntity } from '../entities/user.entity';
 import { UserHistorySnapshotEntity } from '../entities/user-history-snapshot.entity';
-import { Status, UserAccessLevel } from '@prisma/client';
+import {
+  Status,
+  UserAccessLevel,
+  AutocreditDefinition,
+  AutocreditInterval,
+  AutocreditType,
+  AutocreditStatus,
+} from '@prisma/client';
 
 /**
  * Sample users that can be used for testing or mocking user controller responses
@@ -18,6 +25,12 @@ export const sampleUsers: UserEntity[] = [
     timeCredit: 86400 * 7, // 7 days in seconds
     status: Status.REGISTERED,
     portalConnectedAt: new Date(),
+    autocreditDefinition: AutocreditDefinition.USER,
+    autocreditInterval: AutocreditInterval.MONTHLY,
+    autocreditType: AutocreditType.SET_TO_VALUE,
+    autocreditValue: 5368709120, // 5GB
+    autocreditLastTopup: new Date('2023-06-01T00:00:00Z'),
+    autocreditStatus: AutocreditStatus.ENABLED,
     createdAt: new Date('2023-05-15T10:30:00Z'),
     updatedAt: new Date('2023-06-20T14:45:00Z'),
     refreshToken:
@@ -35,6 +48,12 @@ export const sampleUsers: UserEntity[] = [
     timeCredit: 86400 * 5, // 5 days in seconds
     status: Status.REGISTERED,
     portalConnectedAt: new Date(Date.now() - 3600000), // 1 hour ago
+    autocreditDefinition: AutocreditDefinition.SITE,
+    autocreditInterval: AutocreditInterval.WEEKLY,
+    autocreditType: AutocreditType.ADD_VALUE,
+    autocreditValue: 2147483648, // 2GB
+    autocreditLastTopup: new Date('2023-06-15T00:00:00Z'),
+    autocreditStatus: AutocreditStatus.ENABLED,
     createdAt: new Date('2023-05-20T11:15:00Z'),
     updatedAt: new Date('2023-06-22T09:30:00Z'),
     refreshToken: null,
@@ -51,6 +70,12 @@ export const sampleUsers: UserEntity[] = [
     timeCredit: 3600 * 24, // 24 hours in seconds
     status: Status.REGISTERED,
     portalConnectedAt: new Date(Date.now() - 86400000), // 1 day ago
+    autocreditDefinition: null,
+    autocreditInterval: null,
+    autocreditType: null,
+    autocreditValue: null,
+    autocreditLastTopup: null,
+    autocreditStatus: null,
     createdAt: new Date('2023-06-01T08:00:00Z'),
     updatedAt: new Date('2023-06-10T16:20:00Z'),
     refreshToken:
@@ -68,6 +93,12 @@ export const sampleUsers: UserEntity[] = [
     timeCredit: 3600 * 12, // 12 hours in seconds
     status: Status.REGISTERED,
     portalConnectedAt: null, // Not connected yet
+    autocreditDefinition: AutocreditDefinition.USER,
+    autocreditInterval: AutocreditInterval.DAILY,
+    autocreditType: AutocreditType.SET_TO_VALUE,
+    autocreditValue: 536870912, // 512MB
+    autocreditLastTopup: new Date('2023-06-05T00:00:00Z'),
+    autocreditStatus: AutocreditStatus.DISABLED,
     createdAt: new Date('2023-06-05T15:45:00Z'),
     updatedAt: new Date('2023-06-05T15:45:00Z'),
     refreshToken: null,
@@ -84,6 +115,12 @@ export const sampleUsers: UserEntity[] = [
     timeCredit: 0,
     status: Status.PENDING,
     portalConnectedAt: null,
+    autocreditDefinition: null,
+    autocreditInterval: null,
+    autocreditType: null,
+    autocreditValue: null,
+    autocreditLastTopup: null,
+    autocreditStatus: null,
     createdAt: new Date('2023-06-18T11:30:00Z'),
     updatedAt: new Date('2023-06-18T11:30:00Z'),
     refreshToken: null,
@@ -106,6 +143,12 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     timeCredit: 3600 * 48, // 48 hours
     status: Status.REGISTERED,
     portalConnectedAt: new Date('2023-05-24T23:00:00Z'),
+    autocreditDefinition: null,
+    autocreditInterval: null,
+    autocreditType: null,
+    autocreditValue: null,
+    autocreditLastTopup: null,
+    autocreditStatus: null,
     createdAt: new Date('2023-05-25T00:01:00Z'),
     updatedAt: new Date('2023-05-25T00:01:00Z'),
   }),
@@ -121,6 +164,12 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     timeCredit: 3600 * 36, // 36 hours
     status: Status.REGISTERED,
     portalConnectedAt: new Date('2023-05-27T22:00:00Z'),
+    autocreditDefinition: null,
+    autocreditInterval: null,
+    autocreditType: null,
+    autocreditValue: null,
+    autocreditLastTopup: null,
+    autocreditStatus: null,
     createdAt: new Date('2023-05-28T00:01:00Z'),
     updatedAt: new Date('2023-05-28T00:01:00Z'),
   }),
@@ -136,6 +185,12 @@ export const sampleUserHistory: UserHistorySnapshotEntity[] = [
     timeCredit: 3600 * 30, // 30 hours
     status: Status.REGISTERED,
     portalConnectedAt: new Date('2023-05-31T21:30:00Z'),
+    autocreditDefinition: null,
+    autocreditInterval: null,
+    autocreditType: null,
+    autocreditValue: null,
+    autocreditLastTopup: null,
+    autocreditStatus: null,
     createdAt: new Date('2023-06-01T00:01:00Z'),
     updatedAt: new Date('2023-06-01T00:01:00Z'),
   }),

@@ -1,8 +1,10 @@
+import { endOfDay, isSameMonth, startOfDay } from 'date-fns';
 import { Injectable, Logger } from '@nestjs/common';
 import { LanUsageEntity } from './entities/lan-usage.entity';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { LanInterfaceDto, LanWithUsageDto, NetworkInterfaceDto } from './dto';
 import { InterfaceType } from '@prisma/client';
+import { SnakeWaysLanUsageService } from 'src/snake-ways/lan-usage/snake-ways-lan-usage.service';
 const chalk = require('chalk');
 
 /**
@@ -25,7 +27,10 @@ export interface LanWithUsage {
 export class LanUsageService {
   private readonly logger = new Logger(LanUsageService.name);
 
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly snakeWaysLanUsageService: SnakeWaysLanUsageService,
+  ) {}
 
   /**
    * Get LAN usage entities from the database with filtering options
@@ -57,11 +62,11 @@ export class LanUsageService {
         where.snapshotDate = {};
 
         if (startDate) {
-          where.snapshotDate.gte = startDate;
+          where.snapshotDate.gte = startOfDay(startDate);
         }
 
         if (endDate) {
-          where.snapshotDate.lte = endDate;
+          where.snapshotDate.lte = endOfDay(endDate);
         }
       }
 
@@ -69,7 +74,7 @@ export class LanUsageService {
       const lanUsageRecords = await this.prismaService.lanUsage.findMany({
         where,
         orderBy: {
-          snapshotDate: 'desc',
+          snapshotDate: 'asc',
         },
         take: limit,
         include: {
@@ -86,15 +91,75 @@ export class LanUsageService {
         },
       });
 
-      // Transform to entities
-      return lanUsageRecords.map(
-        (record) =>
-          new LanUsageEntity({
+      // Group records by LAN ID for usage calculation
+      const groupedByLan: Record<string, any[]> = {};
+      for (const record of lanUsageRecords) {
+        if (!groupedByLan[record.lanId]) {
+          groupedByLan[record.lanId] = [];
+        }
+        groupedByLan[record.lanId].push(record);
+      }
+
+      // Calculate usage for each LAN and enhance records
+      const enhancedRecords: any[] = [];
+
+      for (const [lanId, lanRecords] of Object.entries(groupedByLan)) {
+        if (lanRecords.length >= 2) {
+          // Calculate usage: last record - first record in the date range
+          const firstRecord = lanRecords[0];
+          const lastRecord = lanRecords[lanRecords.length - 1];
+
+          // Calculate bytes usage
+          const firstBytes =
+            typeof firstRecord.bytes === 'bigint'
+              ? firstRecord.bytes
+              : BigInt(firstRecord.bytes || 0);
+          const lastBytes =
+            typeof lastRecord.bytes === 'bigint'
+              ? lastRecord.bytes
+              : BigInt(lastRecord.bytes || 0);
+
+          // Usage = last - first (since bytes accumulate over time)
+          const usageBigInt = lastBytes - firstBytes;
+          const usage = Number(usageBigInt);
+          const safeUsage = usage < 0 ? 0 : usage;
+
+          // Add the last record with calculated usage info
+          enhancedRecords.push({
+            ...lastRecord,
+            calculatedUsage: safeUsage,
+            formattedUsage: this.formatBytes(safeUsage),
+          });
+        } else if (lanRecords.length === 1) {
+          // If only one record, add it without usage calculation
+          const record = lanRecords[0];
+          enhancedRecords.push({
             ...record,
-            lanName: record.lan?.lanName,
-            wanName: record.wan?.wanName,
-          }),
-      );
+            calculatedUsage: 0,
+            formattedUsage: '0 Bytes',
+          });
+        } else {
+          enhancedRecords.push({
+            ...lanRecords[0],
+            calculatedUsage: 0,
+            formattedUsage: '0 Bytes',
+          });
+        }
+      }
+
+      // Transform to entities and sort by LAN name
+      return enhancedRecords
+        .sort((a, b) =>
+          (a.lan?.lanName || '').localeCompare(b.lan?.lanName || ''),
+        )
+        .map(
+          (record) =>
+            new LanUsageEntity({
+              ...record,
+              lanName: record.lan?.lanName,
+              wanName: record.wan?.wanName,
+            }),
+        );
     } catch (error) {
       this.logger.error(chalk.red('Failed to get LAN usage entities'), error);
       throw new Error(`Failed to get LAN usage entities: ${error.message}`);
@@ -160,11 +225,11 @@ export class LanUsageService {
           usageWhere.snapshotDate = {};
 
           if (startDate) {
-            usageWhere.snapshotDate.gte = startDate;
+            usageWhere.snapshotDate.gte = startOfDay(startDate);
           }
 
           if (endDate) {
-            usageWhere.snapshotDate.lte = endDate;
+            usageWhere.snapshotDate.lte = endOfDay(endDate);
           }
         }
 
@@ -172,7 +237,7 @@ export class LanUsageService {
         const usageRecords = await this.prismaService.lanUsage.findMany({
           where: usageWhere,
           orderBy: {
-            snapshotDate: 'desc',
+            snapshotDate: 'asc',
           },
           include: {
             wan: {
@@ -183,16 +248,97 @@ export class LanUsageService {
           },
         });
 
-        // Calculate total bytes
+        // Calculate usage bytes: last record - first record
         let totalBytes = 0;
-        if (usageRecords.length > 0) {
-          for (const record of usageRecords) {
-            totalBytes += Number(record.bytes);
+        let enhancedUsageRecords: any[] = [];
+
+        if (usageRecords.length >= 2) {
+          // Calculate usage: last record - first record in the date range
+          const firstRecord = usageRecords[0];
+          const lastRecord = usageRecords[usageRecords.length - 1];
+
+          const isWithinSameMonth = isSameMonth(
+            firstRecord.snapshotDate,
+            lastRecord.snapshotDate,
+          );
+
+          if (isWithinSameMonth) {
+            // Calculate bytes usage
+            const firstBytes =
+              typeof firstRecord.bytes === 'bigint'
+                ? firstRecord.bytes
+                : BigInt(firstRecord.bytes || 0);
+            const lastBytes =
+              typeof lastRecord.bytes === 'bigint'
+                ? lastRecord.bytes
+                : BigInt(lastRecord.bytes || 0);
+
+            // Usage = last - first (since bytes accumulate over time)
+            const usageBigInt = lastBytes - firstBytes;
+            totalBytes = Math.abs(Number(usageBigInt));
+
+            // Add the last record with calculated usage info
+          } else {
+            const recordsOfStartMonth = usageRecords.filter((record) =>
+              isSameMonth(record.snapshotDate, firstRecord.snapshotDate),
+            );
+            const recordsOfEndMonth = usageRecords.filter((record) =>
+              isSameMonth(record.snapshotDate, lastRecord.snapshotDate),
+            );
+
+            const firstRecordOfStartMonth = recordsOfStartMonth[0];
+            const firstRecordOfEndMonth = recordsOfEndMonth[0];
+            const lastRecordOfStartMonth =
+              recordsOfStartMonth[recordsOfStartMonth.length - 1];
+            const lastRecordOfEndMonth =
+              recordsOfEndMonth[recordsOfEndMonth.length - 1];
+
+            const firstRecordOfStartMonthBytes =
+              typeof firstRecordOfStartMonth.bytes === 'bigint'
+                ? firstRecordOfStartMonth.bytes
+                : BigInt(firstRecordOfStartMonth.bytes || 0);
+            const firstRecordOfEndMonthBytes =
+              typeof firstRecordOfEndMonth.bytes === 'bigint'
+                ? firstRecordOfEndMonth.bytes
+                : BigInt(firstRecordOfEndMonth.bytes || 0);
+            const lastRecordOfStartMonthBytes =
+              typeof lastRecordOfStartMonth.bytes === 'bigint'
+                ? lastRecordOfStartMonth.bytes
+                : BigInt(lastRecordOfStartMonth.bytes || 0);
+            const lastRecordOfEndMonthBytes =
+              typeof lastRecordOfEndMonth.bytes === 'bigint'
+                ? lastRecordOfEndMonth.bytes
+                : BigInt(lastRecordOfEndMonth.bytes || 0);
+
+            const firstMonthUsage = Number(
+              lastRecordOfStartMonthBytes - firstRecordOfStartMonthBytes,
+            );
+            const lastMonthUsage = Number(
+              lastRecordOfEndMonthBytes - firstRecordOfEndMonthBytes,
+            );
+
+            totalBytes = Math.abs(firstMonthUsage + lastMonthUsage);
           }
+          enhancedUsageRecords.push({
+            ...lastRecord,
+            calculatedUsage: totalBytes,
+            formattedUsage: this.formatBytes(totalBytes),
+          });
+        } else if (usageRecords.length === 1) {
+          // If only one record, add it without usage calculation
+          const record = usageRecords[0];
+          enhancedUsageRecords.push({
+            ...record,
+            calculatedUsage: 0,
+            formattedUsage: '0 Bytes',
+          });
+          totalBytes = 0;
+        } else {
+          totalBytes = 0;
         }
 
         // Transform to LanUsageEntity objects
-        const usageEntities = usageRecords.map(
+        const usageEntities = enhancedUsageRecords.map(
           (record) =>
             new LanUsageEntity({
               ...record,
@@ -229,7 +375,7 @@ export class LanUsageService {
         // Add to result array
         result.push({
           id: lan.id,
-          lanId: lan.lanId,
+          lanId: lan.id,
           lanName: lan.lanName,
           ipAddress: lan.ipAddress,
           subnetmask: lan.subnetmask,
@@ -246,6 +392,57 @@ export class LanUsageService {
     } catch (error) {
       this.logger.error(chalk.red('Failed to get LANs with usage data'), error);
       throw new Error(`Failed to get LANs with usage data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Attempt to restart Snake Ways polling if it has stopped
+   * @returns Object indicating if polling was restarted and a status message
+   */
+  async restartPolling(): Promise<{ restarted: boolean; message: string }> {
+    try {
+      this.logger.log(
+        chalk.cyan(
+          'Attempting to restart Snake Ways LAN Usage service polling',
+        ),
+      );
+
+      const wasRestarted =
+        await this.snakeWaysLanUsageService.restartPollingIfStopped();
+
+      if (wasRestarted) {
+        this.logger.log(
+          chalk.green.bold(
+            'Snake Ways LAN Usage service polling restarted successfully',
+          ),
+        );
+        return {
+          restarted: true,
+          message: 'Polling restarted successfully',
+        };
+      } else {
+        this.logger.log(
+          chalk.yellow(
+            'Snake Ways LAN Usage service polling was already active, no restart needed',
+          ),
+        );
+        return {
+          restarted: false,
+          message:
+            'LAN Usage service polling was already active, no restart needed',
+        };
+      }
+    } catch (error) {
+      this.logger.error(
+        chalk.red.bold(
+          'Failed to restart Snake Ways LAN Usage service polling',
+        ),
+        error,
+      );
+      return {
+        restarted: false,
+        message: `Failed to restart LAN Usage service polling: ${error.message}`,
+      };
     }
   }
 

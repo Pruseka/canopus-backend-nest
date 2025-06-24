@@ -56,6 +56,45 @@ export class UserController {
     }
   }
 
+  @Get('snake-ways-with-usage')
+  @ApiResponse({
+    status: 200,
+    description:
+      'Returns all users from Snake Ways with their current usage data',
+    type: [UserEntity],
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Snake Ways service is unavailable',
+  })
+  @ApiOperation({
+    summary: 'Get users directly from Snake Ways with usage data',
+  })
+  async getSnakeWaysUsersWithUsage(): Promise<UserEntity[]> {
+    try {
+      return await this.userService.getSnakeWaysUsersWithUsage();
+    } catch (error) {
+      // Let NestJS handle the error with its built-in exception filter
+      throw error;
+    }
+  }
+
+  @Get('with-usage')
+  @ApiResponse({
+    status: 200,
+    description: 'Returns all users from database with usage data',
+    type: [UserEntity],
+  })
+  @ApiOperation({ summary: 'Get all users with their current usage data' })
+  async getUsersWithUsage(): Promise<UserEntity[]> {
+    try {
+      return await this.userService.getUsersWithUsage();
+    } catch (error) {
+      // Let NestJS handle the error with its built-in exception filter
+      throw error;
+    }
+  }
+
   @Post('sync')
   @ApiResponse({
     status: 200,
@@ -92,7 +131,29 @@ export class UserController {
     summary: 'Restart Snake Ways polling if it has stopped due to failures',
   })
   async restartPolling(): Promise<{ restarted: boolean; message: string }> {
-    return await this.userService.restartPolling();
+    return await this.userService.restartUsersPolling();
+  }
+
+  @Post('restart-snapshots-polling')
+  @ApiResponse({
+    status: 200,
+    description: 'Restart Snake Ways snapshots polling if it has stopped',
+    schema: {
+      type: 'object',
+      properties: {
+        restarted: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Polling restarted successfully' },
+      },
+    },
+  })
+  @ApiOperation({
+    summary: 'Restart Snake Ways snapshots polling if it has stopped',
+  })
+  async restartSnapshotsPolling(): Promise<{
+    restarted: boolean;
+    message: string;
+  }> {
+    return await this.userService.restartSnapshotsPolling();
   }
 
   @UseGuards(JwtAuthGuard)
@@ -122,7 +183,7 @@ export class UserController {
     return await this.userService.getHistory(startDate, endDate);
   }
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Get('history/:userId')
   @ApiResponse({
     status: 200,

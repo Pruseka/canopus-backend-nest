@@ -17,10 +17,22 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Health check endpoint for Docker and monitoring
+  app.getHttpAdapter().get('/health', (req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'canopus-backend-api',
+      version: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+    });
+  });
+
   const config = new DocumentBuilder()
     .setTitle('Canopus API')
     .setDescription('API for Canopus')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -33,6 +45,11 @@ async function bootstrap() {
   const { httpAdapter } = app.get(HttpAdapterHost);
   app.useGlobalFilters(new PrismaClientExceptionFilter(httpAdapter));
 
-  await app.listen(process.env.PORT ?? 4000);
+  const port = process.env.PORT ?? 4000;
+  await app.listen(port);
+
+  console.log(`🚀 Application is running on: http://localhost:${port}`);
+  console.log(`📚 Swagger documentation: http://localhost:${port}/api`);
+  console.log(`❤️  Health check: http://localhost:${port}/health`);
 }
 void bootstrap();

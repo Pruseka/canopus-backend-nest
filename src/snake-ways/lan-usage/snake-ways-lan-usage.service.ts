@@ -93,7 +93,14 @@ export class SnakeWaysLanUsageService
 
   async onModuleInit() {
     // Start polling LAN usage on module init
-    this.startPollingLanUsage();
+    setTimeout(() => {
+      this.logger.log(
+        chalk.blue(
+          'Starting LAN polling with delayed start (after interfaces)',
+        ),
+      );
+      this.startPollingLanUsage();
+    }, 5000);
   }
 
   private startPollingLanUsage() {
@@ -114,7 +121,7 @@ export class SnakeWaysLanUsageService
 
     this.lanUsageDataStream$ = this.createPollingObservable<{
       lanusage: LanUsageData[];
-    }>('/lanusage', this.pollingIntervalInMins * 60000); // Convert minutes to milliseconds
+    }>('/lanusage', this.pollingIntervalInMins * 1000); // Convert minutes to milliseconds
 
     this.lanUsagePollingSubscription = this.lanUsageDataStream$.subscribe({
       next: async (data) => {
@@ -176,7 +183,7 @@ export class SnakeWaysLanUsageService
       for (const usage of lanUsageData) {
         // Lookup the LAN and WAN by their Snake Ways IDs
         const lan = await this.prismaService.lan.findUnique({
-          where: { lanId: usage.LanID },
+          where: { id: usage.LanID },
         });
 
         if (!lan) {
@@ -247,6 +254,7 @@ export class SnakeWaysLanUsageService
               startTime,
               endTime,
               updatedAt: new Date(),
+              snapshotDate: today,
             },
           });
 
@@ -340,6 +348,7 @@ export class SnakeWaysLanUsageService
     }
   }
 
+  //! [Unused]
   /**
    * Get aggregated LAN usage data for the specified period
    * @param period Period type (daily, weekly, monthly)

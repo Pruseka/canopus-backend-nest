@@ -14,38 +14,57 @@ datasource db {
 }
 
 model User {
-  id                  String                @id @default(cuid())
-  email               String                @unique
-  name                String?
-  password            String
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  refreshToken        String?
-  accessLevel         UserAccessLevel       @default(USER)
-  autoCredit          Boolean               @default(false)
-  dataCredit          BigInt                @default(0)
-  displayName         String?
-  status              Status                @default(REGISTERED)
-  portalConnectedAt   DateTime?
-  timeCredit          BigInt                @default(0)
-  UserHistorySnapshot UserHistorySnapshot[]
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  name                 String?
+  password             String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  refreshToken         String?
+  accessLevel          UserAccessLevel       @default(USER)
+  autoCredit           Boolean               @default(false)
+  dataCredit           BigInt                @default(0)
+  displayName          String?
+  status               Status                @default(REGISTERED)
+  portalConnectedAt    DateTime?
+  timeCredit           BigInt                @default(0)
+  autocreditDefinition AutocreditDefinition? @default(NOT_FOUND)
+  autocreditInterval   AutocreditInterval?   @default(MONTHLY)
+  autocreditType       AutocreditType?       @default(ADD_VALUE)
+  autocreditValue      BigInt?               @default(0)
+  autocreditLastTopup  DateTime?
+  autocreditStatus     AutocreditStatus?     @default(DISABLED)
+  usageDebit           BigInt                @default(0)
+  usageCredit          BigInt                @default(0)
+  usageQuota           BigInt                @default(0)
+  lastUsageUpdate      DateTime?
+  UserHistorySnapshot  UserHistorySnapshot[]
 }
 
 model UserHistorySnapshot {
-  id                String          @id @default(cuid())
-  userId            String
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  snapshotDate      DateTime        @default(now())
-  accessLevel       UserAccessLevel @default(USER)
-  autoCredit        Boolean         @default(false)
-  dataCredit        BigInt          @default(0)
-  name              String?
-  displayName       String?
-  status            Status          @default(REGISTERED)
-  portalConnectedAt DateTime?
-  timeCredit        BigInt          @default(0)
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id                   String                @id @default(cuid())
+  userId               String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  snapshotDate         DateTime              @default(now())
+  accessLevel          UserAccessLevel       @default(USER)
+  autoCredit           Boolean               @default(false)
+  dataCredit           BigInt                @default(0)
+  name                 String?
+  displayName          String?
+  status               Status                @default(REGISTERED)
+  portalConnectedAt    DateTime?
+  timeCredit           BigInt                @default(0)
+  autocreditDefinition AutocreditDefinition? @default(NOT_FOUND)
+  autocreditInterval   AutocreditInterval?   @default(MONTHLY)
+  autocreditType       AutocreditType?       @default(ADD_VALUE)
+  autocreditValue      BigInt?               @default(0)
+  autocreditLastTopup  DateTime?
+  autocreditStatus     AutocreditStatus?     @default(DISABLED)
+  usageDebit           BigInt                @default(0)
+  usageCredit          BigInt                @default(0)
+  usageQuota           BigInt                @default(0)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([userId, snapshotDate])
 }
@@ -82,7 +101,6 @@ model Lan {
   id            String         @id @default(cuid())
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  lanId         String         @unique
   lanName       String
   interfaces    LanInterface[]
   ipAddress     String
@@ -222,4 +240,27 @@ enum InterfaceType {
   LTE // 6
   LINK_EXTENDER // 7
   EXTENDER // 8
+}
+
+enum AutocreditDefinition {
+  NOT_FOUND
+  USER
+  SITE
+  SITE_GROUP
+}
+
+enum AutocreditInterval {
+  MONTHLY
+  WEEKLY
+  DAILY
+}
+
+enum AutocreditType {
+  ADD_VALUE
+  SET_TO_VALUE
+}
+
+enum AutocreditStatus {
+  DISABLED
+  ENABLED
 }
