@@ -1,8 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Status, UserAccessLevel, UserHistorySnapshot } from '@prisma/client';
+import {
+  Status,
+  UserAccessLevel,
+  UserHistorySnapshot,
+  AutocreditDefinition,
+  AutocreditInterval,
+  AutocreditType,
+  AutocreditStatus,
+} from '@prisma/client';
 
 export class UserHistorySnapshotEntity
-  implements Omit<UserHistorySnapshot, 'timeCredit' | 'dataCredit'>
+  implements
+    Omit<
+      UserHistorySnapshot,
+      | 'timeCredit'
+      | 'dataCredit'
+      | 'autocreditValue'
+      | 'usageDebit'
+      | 'usageCredit'
+      | 'usageQuota'
+    >
 {
   constructor(partial: Partial<any>) {
     Object.assign(this, partial);
@@ -23,6 +40,40 @@ export class UserHistorySnapshotEntity
         this.timeCredit = Number(partial.timeCredit);
       } else {
         this.timeCredit = Number(partial.timeCredit);
+      }
+    }
+
+    if (partial.autocreditValue !== undefined) {
+      // Handle if it's a bigint
+      if (typeof partial.autocreditValue === 'bigint') {
+        this.autocreditValue = Number(partial.autocreditValue);
+      } else {
+        this.autocreditValue = Number(partial.autocreditValue);
+      }
+    }
+
+    // Handle usage fields BigInt conversion
+    if (partial.usageDebit !== undefined) {
+      if (typeof partial.usageDebit === 'bigint') {
+        this.usageDebit = Number(partial.usageDebit);
+      } else {
+        this.usageDebit = Number(partial.usageDebit);
+      }
+    }
+
+    if (partial.usageCredit !== undefined) {
+      if (typeof partial.usageCredit === 'bigint') {
+        this.usageCredit = Number(partial.usageCredit);
+      } else {
+        this.usageCredit = Number(partial.usageCredit);
+      }
+    }
+
+    if (partial.usageQuota !== undefined) {
+      if (typeof partial.usageQuota === 'bigint') {
+        this.usageQuota = Number(partial.usageQuota);
+      } else {
+        this.usageQuota = Number(partial.usageQuota);
       }
     }
   }
@@ -111,4 +162,140 @@ export class UserHistorySnapshotEntity
     example: 3600, // 1 hour
   })
   timeCredit: number;
+
+  @ApiProperty({
+    enum: AutocreditDefinition,
+    description: 'Autocredit definition type',
+    example: AutocreditDefinition.USER,
+    nullable: true,
+  })
+  autocreditDefinition: AutocreditDefinition | null;
+
+  @ApiProperty({
+    enum: AutocreditInterval,
+    description: 'Autocredit interval',
+    example: AutocreditInterval.MONTHLY,
+    nullable: true,
+  })
+  autocreditInterval: AutocreditInterval | null;
+
+  @ApiProperty({
+    enum: AutocreditType,
+    description: 'Autocredit type',
+    example: AutocreditType.ADD_VALUE,
+    nullable: true,
+  })
+  autocreditType: AutocreditType | null;
+
+  @ApiProperty({
+    description: 'Autocredit value in bytes',
+    example: 5368709120, // 5GB
+    nullable: true,
+  })
+  autocreditValue: number | null;
+
+  @ApiProperty({
+    description: 'Last time autocredit was applied',
+    example: '2023-05-15T10:30:00Z',
+    nullable: true,
+  })
+  autocreditLastTopup: Date | null;
+
+  @ApiProperty({
+    enum: AutocreditStatus,
+    description: 'Autocredit status',
+    example: AutocreditStatus.ENABLED,
+    nullable: true,
+  })
+  autocreditStatus: AutocreditStatus | null;
+
+  @ApiProperty({
+    description: 'Calculated data usage in bytes',
+    example: 1073741824, // 1GB
+  })
+  calculatedDataUsage: number;
+
+  @ApiProperty({
+    description: 'Calculated time usage in seconds',
+    example: 3600, // 1 hour
+  })
+  calculatedTimeUsage: number;
+
+  @ApiProperty({
+    description: 'Calculated auto-credit usage in bytes',
+    example: 5368709120, // 5GB
+  })
+  calculatedAutoCreditUsage: number;
+
+  @ApiProperty({
+    description: 'Formatted data usage',
+    example: '1.5 GB',
+  })
+  formattedDataUsage: string;
+
+  @ApiProperty({
+    description: 'Formatted time usage',
+    example: '1.5 hours',
+  })
+  formattedTimeUsage: string;
+
+  @ApiProperty({
+    description: 'Formatted auto-credit usage',
+    example: '1.5 GB',
+  })
+  formattedAutoCreditUsage: string;
+
+  @ApiProperty({
+    description: 'Total actual usage (debit) in bytes from RecordType 2',
+    example: 1073741824, // 1GB
+  })
+  usageDebit: number;
+
+  @ApiProperty({
+    description: 'Remaining credit (quota - debit) in bytes',
+    example: 4294967296, // 4GB
+  })
+  usageCredit: number;
+
+  @ApiProperty({
+    description: 'Monthly quota from autocredit in bytes',
+    example: 5368709120, // 5GB
+  })
+  usageQuota: number;
+
+  @ApiProperty({
+    description: 'Calculated usage debit change between snapshots',
+    example: 1073741824, // 1GB
+  })
+  calculatedUsageDebit: number;
+
+  @ApiProperty({
+    description: 'Calculated usage credit change between snapshots',
+    example: 1073741824, // 1GB
+  })
+  calculatedUsageCredit: number;
+
+  @ApiProperty({
+    description: 'Calculated usage quota change between snapshots',
+    example: 0, // Usually 0 unless quota changed
+  })
+  calculatedUsageQuota: number;
+
+  @ApiProperty({
+    description: 'Formatted usage debit change',
+    example: '1.0 GB',
+  })
+  formattedUsageDebit: string;
+
+  @ApiProperty({
+    description: 'Formatted usage credit change',
+    example: '1.0 GB',
+  })
+  formattedUsageCredit: string;
+
+  @ApiProperty({
+    description: 'Formatted usage quota change',
+    example: '0 Bytes',
+  })
+  formattedUsageQuota: string;
 }

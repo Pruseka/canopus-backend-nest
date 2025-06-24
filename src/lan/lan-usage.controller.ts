@@ -6,6 +6,7 @@ import {
   ParseDatePipe,
   UsePipes,
   ValidationPipe,
+  Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { LanUsageEntity } from './entities/lan-usage.entity';
@@ -66,5 +67,24 @@ export class LanUsageController {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
     }) as Promise<LanWithUsageDto[]>;
+  }
+
+  @Post('restart-polling')
+  @ApiResponse({
+    status: 200,
+    description: 'Restart Snake Ways polling if it has stopped',
+    schema: {
+      type: 'object',
+      properties: {
+        restarted: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Polling restarted successfully' },
+      },
+    },
+  })
+  @ApiOperation({
+    summary: 'Restart Snake Ways polling if it has stopped',
+  })
+  async restartPolling(): Promise<{ restarted: boolean; message: string }> {
+    return await this.lanUsageService.restartPolling();
   }
 }

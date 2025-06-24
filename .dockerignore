@@ -1,6 +1,92 @@
+# Dependencies
 node_modules
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
 dist
+build
+.next
+
+# Environment files
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Version control
 .git
-Dockerfile
-docker-compose.yml
+.gitignore
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# Test output
+.nyc_output
+
+# Docker files (don't include in Docker context)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Development files
+.editorconfig
+.eslintrc*
+.prettierrc*
+jest.config.js
+.husky/
+
+# Temporary files
+tmp/
+temp/
+
+# Lock files (keep pnpm-lock.yaml for consistency)
+package-lock.json
+yarn.lock
+
+# Prisma files that shouldn't be in production container
+prisma/migrations/
+!prisma/schema.prisma
+
+# Test files
+test/
+spec/
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Example files
+*.example
+example-*

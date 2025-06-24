@@ -1,13 +1,33 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Status, User, UserAccessLevel } from '@prisma/client';
+import {
+  Status,
+  User,
+  UserAccessLevel,
+  AutocreditDefinition,
+  AutocreditInterval,
+  AutocreditType,
+  AutocreditStatus,
+} from '@prisma/client';
 import { Exclude } from 'class-transformer';
 
-export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
-  constructor(partial: Partial<any>) {
+export class UserEntity
+  implements
+    Omit<
+      User,
+      | 'dataCredit'
+      | 'timeCredit'
+      | 'autocreditValue'
+      | 'usageDebit'
+      | 'usageCredit'
+      | 'usageQuota'
+      | 'lastUsageUpdate'
+    >
+{
+  constructor(partial: Partial<any> = {}) {
     Object.assign(this, partial);
 
     // Handle bigint conversion for serialization
-    if (partial.dataCredit !== undefined) {
+    if (partial && partial.dataCredit !== undefined) {
       // Handle if it's a bigint
       if (typeof partial.dataCredit === 'bigint') {
         this.dataCredit = Number(partial.dataCredit);
@@ -16,7 +36,7 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
       }
     }
 
-    if (partial.timeCredit !== undefined) {
+    if (partial && partial.timeCredit !== undefined) {
       // Handle if it's a bigint
       if (typeof partial.timeCredit === 'bigint') {
         this.timeCredit = Number(partial.timeCredit);
@@ -24,6 +44,45 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
         this.timeCredit = Number(partial.timeCredit);
       }
     }
+
+    if (partial && partial.autocreditValue !== undefined) {
+      // Handle if it's a bigint
+      if (typeof partial.autocreditValue === 'bigint') {
+        this.autocreditValue = Number(partial.autocreditValue);
+      } else {
+        this.autocreditValue = Number(partial.autocreditValue);
+      }
+    }
+
+    // Handle usage fields BigInt conversion
+    if (partial && partial.usageDebit !== undefined) {
+      if (typeof partial.usageDebit === 'bigint') {
+        this.usageDebit = Number(partial.usageDebit);
+      } else {
+        this.usageDebit = Number(partial.usageDebit);
+      }
+    }
+
+    if (partial && partial.usageCredit !== undefined) {
+      if (typeof partial.usageCredit === 'bigint') {
+        this.usageCredit = Number(partial.usageCredit);
+      } else {
+        this.usageCredit = Number(partial.usageCredit);
+      }
+    }
+
+    if (partial && partial.usageQuota !== undefined) {
+      if (typeof partial.usageQuota === 'bigint') {
+        this.usageQuota = Number(partial.usageQuota);
+      } else {
+        this.usageQuota = Number(partial.usageQuota);
+      }
+    }
+
+    // Ensure usage fields have default values if not provided
+    if (this.usageDebit === undefined) this.usageDebit = 0;
+    if (this.usageCredit === undefined) this.usageCredit = 0;
+    if (this.usageQuota === undefined) this.usageQuota = 0;
   }
 
   @ApiProperty({
@@ -116,4 +175,68 @@ export class UserEntity implements Omit<User, 'dataCredit' | 'timeCredit'> {
     example: 3600, // 1 hour
   })
   timeCredit: number;
+
+  @ApiProperty({
+    enum: AutocreditDefinition,
+    description: 'Autocredit definition type',
+    example: AutocreditDefinition.USER,
+    nullable: true,
+  })
+  autocreditDefinition: AutocreditDefinition | null;
+
+  @ApiProperty({
+    enum: AutocreditInterval,
+    description: 'Autocredit interval',
+    example: AutocreditInterval.MONTHLY,
+    nullable: true,
+  })
+  autocreditInterval: AutocreditInterval | null;
+
+  @ApiProperty({
+    enum: AutocreditType,
+    description: 'Autocredit type',
+    example: AutocreditType.ADD_VALUE,
+    nullable: true,
+  })
+  autocreditType: AutocreditType | null;
+
+  @ApiProperty({
+    description: 'Autocredit value in bytes',
+    example: 5368709120, // 5GB
+    nullable: true,
+  })
+  autocreditValue: number | null;
+
+  @ApiProperty({
+    description: 'Last time autocredit was applied',
+    example: '2023-05-15T10:30:00Z',
+    nullable: true,
+  })
+  autocreditLastTopup: Date | null;
+
+  @ApiProperty({
+    enum: AutocreditStatus,
+    description: 'Autocredit status',
+    example: AutocreditStatus.ENABLED,
+    nullable: true,
+  })
+  autocreditStatus: AutocreditStatus | null;
+
+  @ApiProperty({
+    description: 'Total actual usage (debit) in bytes from RecordType 2',
+    example: 1073741824, // 1GB
+  })
+  usageDebit: number;
+
+  @ApiProperty({
+    description: 'Remaining credit (quota - debit) in bytes',
+    example: 4294967296, // 4GB
+  })
+  usageCredit: number;
+
+  @ApiProperty({
+    description: 'Monthly quota from autocredit in bytes',
+    example: 5368709120, // 5GB
+  })
+  usageQuota: number;
 }

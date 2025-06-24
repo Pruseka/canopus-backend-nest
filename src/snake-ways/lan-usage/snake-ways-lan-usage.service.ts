@@ -93,7 +93,14 @@ export class SnakeWaysLanUsageService
 
   async onModuleInit() {
     // Start polling LAN usage on module init
-    this.startPollingLanUsage();
+    setTimeout(() => {
+      this.logger.log(
+        chalk.blue(
+          'Starting LAN polling with delayed start (after interfaces)',
+        ),
+      );
+      this.startPollingLanUsage();
+    }, 5000);
   }
 
   private startPollingLanUsage() {
@@ -114,7 +121,7 @@ export class SnakeWaysLanUsageService
 
     this.lanUsageDataStream$ = this.createPollingObservable<{
       lanusage: LanUsageData[];
-    }>('/lanusage', this.pollingIntervalInMins * 60000); // Convert minutes to milliseconds
+    }>('/lanusage', this.pollingIntervalInMins * 1000); // Convert minutes to milliseconds
 
     this.lanUsagePollingSubscription = this.lanUsageDataStream$.subscribe({
       next: async (data) => {
@@ -169,11 +176,14 @@ export class SnakeWaysLanUsageService
         ),
       );
 
+      const today = new Date();
+      const startOfToday = startOfDay(today);
+
       // Process each LAN usage record
       for (const usage of lanUsageData) {
         // Lookup the LAN and WAN by their Snake Ways IDs
         const lan = await this.prismaService.lan.findUnique({
-          where: { lanId: usage.LanID },
+          where: { id: usage.LanID },
         });
 
         if (!lan) {
@@ -186,7 +196,7 @@ export class SnakeWaysLanUsageService
         }
 
         // Find the WAN by ID from Snake Ways
-        const wan = await this.prismaService.wan.findFirst({
+        const wan = await this.prismaService.wan.findUnique({
           where: { id: usage.WanID },
         });
 
@@ -199,41 +209,24 @@ export class SnakeWaysLanUsageService
           continue;
         }
 
+        // Check if we already have a snapshot for this LAN-WAN combination today
+        const existingSnapshot = await this.prismaService.lanUsage.findFirst({
+          where: {
+            lanId: lan.id,
+            wanId: wan.id,
+            snapshotDate: {
+              gte: startOfToday,
+            },
+          },
+        });
+
         // Convert Unix timestamps to JavaScript Date objects
         const startTime = new Date(usage.Starttime * 1000);
         const endTime =
           usage.Endtime === 0 ? null : new Date(usage.Endtime * 1000);
 
-        // Check if a record for this LAN, WAN, and time period already exists
-        const existingRecord = await this.prismaService.lanUsage.findFirst({
-          where: {
-            lanId: lan.id,
-            wanId: wan.id,
-            startTime,
-            endTime,
-          },
-        });
-
-        if (existingRecord) {
-          // Update the existing record if bytes have changed
-          if (BigInt(usage.Bytes) !== existingRecord.bytes) {
-            await this.prismaService.lanUsage.update({
-              where: { id: existingRecord.id },
-              data: {
-                bytes: BigInt(usage.Bytes),
-                updatedAt: new Date(),
-              },
-            });
-            this.logger.log(
-              chalk.green(
-                `Updated LAN usage record for ${usage.LanName} on ${usage.WanName} from ${startTime.toISOString()} to ${
-                  endTime ? endTime.toISOString() : 'now'
-                }`,
-              ),
-            );
-          }
-        } else {
-          // Create a new record
+        if (!existingSnapshot) {
+          // Create a new snapshot
           await this.prismaService.lanUsage.create({
             data: {
               lanId: lan.id,
@@ -241,16 +234,33 @@ export class SnakeWaysLanUsageService
               bytes: BigInt(usage.Bytes),
               startTime,
               endTime,
-              snapshotDate: new Date(),
+              snapshotDate: today,
               createdAt: new Date(),
               updatedAt: new Date(),
             },
           });
+
+          this.logger.log(
+            chalk.green.bold(
+              `Created LAN usage snapshot for ${usage.LanName} on ${usage.WanName}`,
+            ),
+          );
+        } else {
+          // Update the existing snapshot
+          await this.prismaService.lanUsage.update({
+            where: { id: existingSnapshot.id },
+            data: {
+              bytes: BigInt(usage.Bytes),
+              startTime,
+              endTime,
+              updatedAt: new Date(),
+              snapshotDate: today,
+            },
+          });
+
           this.logger.log(
             chalk.green(
-              `Created new LAN usage record for ${usage.LanName} on ${usage.WanName} from ${startTime.toISOString()} to ${
-                endTime ? endTime.toISOString() : 'now'
-              }`,
+              `Updated LAN usage snapshot for ${usage.LanName} on ${usage.WanName}`,
             ),
           );
         }
@@ -338,6 +348,7 @@ export class SnakeWaysLanUsageService
     }
   }
 
+  //! [Unused]
   /**
    * Get aggregated LAN usage data for the specified period
    * @param period Period type (daily, weekly, monthly)

@@ -19,7 +19,7 @@ import { SnakeWaysLanUsageService } from './lan-usage/snake-ways-lan-usage.servi
       useFactory: (configService: ConfigService) => ({
         baseURL: configService.get(
           'SNAKE_WAYS_BASE_URL',
-          'http://localhost:3001',
+          'http://localhost:4000',
         ),
         timeout: configService.get('SNAKE_WAYS_BASE_TIMEOUT', 10000),
         headers: {

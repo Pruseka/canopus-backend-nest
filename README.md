@@ -25,14 +25,135 @@ Canopus Backend is a robust network management API that:
 
 ---
 
-## 🛠️ **Quick Start**
+## 🐳 **Docker Setup & Deployment**
+
+### **Prerequisites**
+
+- Docker 20.10+
+- Docker Compose 2.0+
+- Git
+
+### **🚀 Quick Start with Docker**
+
+1. **Clone the repository**
+
+```bash
+git clone <repository-url>
+cd canopus-backend-nest
+```
+
+2. **Create environment file**
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit the .env file with your configuration
+nano .env  # or use your preferred editor
+```
+
+3. **Start the full application stack**
+
+```bash
+# Production deployment
+docker compose up -d
+
+# The following services will be available:
+# - API: http://localhost:4000
+# - Database: localhost:5434
+# - Swagger: http://localhost:4000/api
+# - Health Check: http://localhost:4000/health
+```
+
+### **🔧 Development with Docker**
+
+```bash
+# Start development environment with hot reload and Prisma Studio
+docker compose --profile dev up -d
+
+# Services available in development mode:
+# - API (dev): http://localhost:4001 (hot reload)
+# - Database: localhost:5434
+# - Prisma Studio: http://localhost:5555
+# - Swagger: http://localhost:4001/api
+```
+
+### **📋 Docker Commands Reference**
+
+#### **Application Management**
+
+```bash
+# Build the application
+pnpm run docker:build
+
+# Start production stack
+pnpm run docker:up
+
+# Start development stack
+pnpm run docker:up:dev
+
+# Stop all services
+pnpm run docker:down
+
+# Stop and remove volumes (⚠️ deletes database data)
+pnpm run docker:down:volumes
+
+# Restart the API service
+pnpm run docker:restart
+
+# View logs
+pnpm run docker:logs         # Production logs
+pnpm run docker:logs:dev     # Development logs
+
+# Access container shell
+pnpm run docker:shell
+```
+
+#### **Database Operations in Docker**
+
+```bash
+# Run database migrations
+docker compose exec canopus-api pnpm run prisma:migrate:prod
+
+# Access Prisma Studio
+pnpm run docker:prisma:studio
+
+# Seed the database
+docker compose exec canopus-api pnpm run prisma:seed
+
+# Reset database (⚠️ deletes all data)
+docker compose exec canopus-api pnpm run prisma:reset
+
+# Generate Prisma client
+docker compose exec canopus-api pnpm run prisma:generate
+```
+
+### **🏗️ Multi-Stage Docker Build**
+
+The Dockerfile uses multi-stage builds for optimal production images:
+
+- **base**: Common dependencies and setup
+- **development**: Development environment with hot reload
+- **deps**: Production dependencies only
+- **build**: Application build stage
+- **production**: Final optimized runtime image
+
+### **🔒 Security Features**
+
+- Non-root user execution
+- Multi-stage builds for minimal attack surface
+- Health checks for container monitoring
+- Proper secret management via environment variables
+
+---
+
+## 🛠️ **Local Development Setup**
 
 ### **Prerequisites**
 
 - Node.js 18+
 - pnpm (recommended) or npm
-- Docker & Docker Compose
-- PostgreSQL (provided via Docker)
+- PostgreSQL 13+ (or use Docker)
 
 ### **1. Installation**
 
@@ -69,8 +190,6 @@ SNAKE_WAYS_INTERFACE_POLLING_INTERVAL=5
 # Application Configuration
 PORT=4000
 NODE_ENV=development
-
-# CORS Configuration
 CORS_ORIGIN="http://localhost:3000"
 ```
 
@@ -84,7 +203,7 @@ pnpm run db:dev:up
 pnpm run prisma:dev:deploy
 
 # Optional: Seed database with sample data
-npx prisma db seed
+pnpm run prisma:seed
 ```
 
 ### **4. Start Development Server**
@@ -100,66 +219,368 @@ pnpm run start:debug
 pnpm run build && pnpm run start:prod
 ```
 
-### **5. Access Swagger Documentation**
-
-Once the server is running, visit: **http://localhost:4000/api**
-
 ---
 
-## 📊 **Database Schema**
+## 🗄️ **Database Management**
 
-### **Core Models**
+### **Prisma Commands**
 
-#### **User Management**
+#### **Migration Management**
+
+```bash
+# Create a new migration
+pnpm run prisma:migrate
+# or
+npx prisma migrate dev --name your-migration-name
+
+# Deploy migrations (production)
+pnpm run prisma:migrate:prod
+# or
+npx prisma migrate deploy
+
+# Reset database (⚠️ deletes all data)
+pnpm run prisma:reset
+# or
+npx prisma migrate reset
+```
+
+#### **Prisma Client**
+
+```bash
+# Generate Prisma client after schema changes
+pnpm run prisma:generate
+# or
+npx prisma generate
+```
+
+#### **Database Seeding**
+
+```bash
+# Seed database with initial data
+pnpm run prisma:seed
+# or
+npx prisma db seed
+```
+
+#### **Prisma Studio - Database GUI**
+
+```bash
+# Open Prisma Studio (local development)
+pnpm run prisma:studio
+# or
+npx prisma studio
+
+# Access at: http://localhost:5555
+
+# For Docker environment
+pnpm run docker:prisma:studio
+# Access at: http://localhost:5555
+```
+
+### **Database Schema Overview**
+
+#### **Core Models**
+
+##### **User Management**
 
 - **`User`**: Core user data with authentication and credits
 - **`UserHistorySnapshot`**: Historical user state tracking
 
-#### **Network Infrastructure**
+##### **Network Infrastructure**
 
 - **`Wan`**: WAN connection configurations and status
 - **`Lan`**: LAN network configurations
 - **`NetworkInterface`**: Physical/virtual network interfaces
 - **`LanInterface`**: LAN-to-interface mappings
 
-#### **Usage Tracking**
+##### **Usage Tracking**
 
 - **`WanUsage`**: WAN bandwidth usage over time
 - **`LanUsage`**: LAN traffic through specific WANs
 
-### **Key Enums**
+### **Database Development Workflow**
 
-```typescript
-enum UserAccessLevel {
-  ADMIN,
-  SITE_ADMIN,
-  SITE_MASTER,
-  USER,
-  PREPAID_USER,
+1. **Make Schema Changes**: Edit `prisma/schema.prisma`
+2. **Create Migration**: `pnpm run prisma:migrate`
+3. **Generate Client**: `pnpm run prisma:generate`
+4. **Update TypeScript**: Restart your IDE/development server
+5. **Test Changes**: Run tests and verify functionality
+
+---
+
+## 🔌 **Snake Ways Integration**
+
+### **🏗️ Service Architecture**
+
+The Snake Ways integration consists of multiple specialized services:
+
+- **`SnakeWaysUserService`**: User synchronization and history tracking
+- **`SnakeWaysWanService`**: WAN data synchronization and route control
+- **`SnakeWaysLanService`**: LAN configuration synchronization
+- **`SnakeWaysInterfaceService`**: Network interface monitoring
+- **`SnakeWaysWanUsageService`**: WAN usage data tracking
+- **`SnakeWaysLanUsageService`**: LAN usage data tracking
+
+### **⚙️ Polling Configuration**
+
+Each service runs on configurable polling intervals:
+
+```bash
+# Environment variables for polling intervals (in minutes)
+SNAKE_WAYS_USER_POLLING_INTERVAL=5           # User data sync
+SNAKE_WAYS_WAN_POLLING_INTERVAL=5            # WAN configuration sync
+SNAKE_WAYS_LAN_POLLING_INTERVAL=5            # LAN configuration sync
+SNAKE_WAYS_INTERFACE_POLLING_INTERVAL=5      # Network interface sync
+SNAKE_WAYS_WAN_USAGE_POLLING_INTERVAL=5      # WAN usage data sync
+SNAKE_WAYS_LAN_USAGE_POLLING_INTERVAL=5      # LAN usage data sync
+SNAKE_WAYS_USER_SNAPSHOT_POLLING_INTERVAL=60 # User history snapshots
+```
+
+### **🔄 Force Synchronization**
+
+Manual synchronization endpoints for immediate data refresh:
+
+#### **User Synchronization**
+
+```bash
+# Force sync all users
+POST /users/sync
+
+# Example response:
+{
+  "message": "User synchronization completed",
+  "syncedUsers": 25,
+  "errors": 0
 }
-enum WanStatus {
-  READY,
-  ERROR,
-  SUSPENDED,
-  INITIALIZING,
-  ALL_WAN_FORCED_OFF,
-  NOT_READY,
-  QUOTA_REACHED,
-  ONLINE,
+```
+
+#### **WAN Synchronization**
+
+```bash
+# Force sync all WANs
+POST /wans/sync
+
+# Example response:
+{
+  "message": "WAN synchronization completed",
+  "syncedWans": 3,
+  "errors": 0
 }
-enum PrepaidUsageMode {
-  DISALLOW,
-  ALLOW,
-  LIMITED,
+```
+
+#### **LAN Synchronization**
+
+```bash
+# Force sync all LANs
+POST /lans/sync
+
+# Example response:
+{
+  "message": "LAN synchronization completed",
+  "syncedLans": 5,
+  "errors": 0
 }
-enum InterfaceType {
-  ETHERNET,
-  WIFI_AP,
-  WIFI_MANAGED,
-  LTE,
-  LINK_EXTENDER,
-  EXTENDER,
+```
+
+#### **Interface Synchronization**
+
+```bash
+# Force sync all network interfaces
+POST /interfaces/sync
+
+# Example response:
+{
+  "message": "Interface synchronization completed",
+  "syncedInterfaces": 8,
+  "errors": 0
 }
+```
+
+### **🔄 Restart Polling Services**
+
+When polling services stop due to consecutive failures, use these endpoints to restart them:
+
+#### **Restart User Polling**
+
+```bash
+# Restart user data polling
+POST /users/restart-polling
+
+# Restart user snapshots polling
+POST /users/restart-snapshots-polling
+
+# Example response:
+{
+  "message": "Snake Ways polling restarted successfully",
+  "service": "user",
+  "status": "active"
+}
+```
+
+#### **Restart WAN Polling**
+
+```bash
+# Restart WAN data polling
+POST /wans/restart-polling
+
+# Restart WAN usage polling
+POST /wan-usage/restart-polling
+
+# Example response:
+{
+  "message": "Snake Ways WAN service polling restarted successfully",
+  "service": "wan",
+  "status": "active"
+}
+```
+
+#### **Restart LAN Polling**
+
+```bash
+# Restart LAN data polling
+POST /lans/restart-polling
+
+# Restart LAN usage polling
+POST /lan-usage/restart-polling
+
+# Example response:
+{
+  "message": "Snake Ways LAN service polling restarted successfully",
+  "service": "lan",
+  "status": "active"
+}
+```
+
+#### **Restart Interface Polling**
+
+```bash
+# Restart interface polling
+POST /interfaces/restart-polling
+
+# Example response:
+{
+  "message": "Snake Ways interface service polling restarted successfully",
+  "service": "interface",
+  "status": "active"
+}
+```
+
+### **⚡ Real-time Data Access**
+
+Get live data directly from Snake Ways without waiting for polling:
+
+#### **Live User Data**
+
+```bash
+# Get users directly from Snake Ways
+GET /users/snake-ways
+
+# Get users with current usage data
+GET /users/snake-ways/with-usage
+```
+
+#### **Live WAN Data**
+
+```bash
+# Get WANs directly from Snake Ways
+GET /wans/snake-ways
+
+# Get current system route status
+GET /wans/route
+
+# Change system route
+PUT /wans/route
+Body: {
+  "WanID": "979FC0CE166A11EDA4F51737CD617E52"  // or "AUTO" or "OFF"
+}
+```
+
+#### **Live LAN Data**
+
+```bash
+# Get LANs directly from Snake Ways
+GET /lans/snake-ways
+```
+
+#### **Live Interface Data**
+
+```bash
+# Get interfaces directly from Snake Ways
+GET /interfaces/snake-ways
+```
+
+### **🛠️ Error Handling & Resilience**
+
+#### **Circuit Breaker Pattern**
+
+- Services automatically stop polling after consecutive failures
+- Configurable failure threshold: `SNAKE_WAYS_MAX_CONSECUTIVE_FAILURES=5`
+- Manual restart available via API endpoints
+
+#### **Exponential Backoff**
+
+- Automatic retry with increasing delays
+- Base delay: `SNAKE_WAYS_BASE_RETRY_DELAY=1000ms`
+- Maximum delay: `SNAKE_WAYS_MAX_RETRY_DELAY=30000ms`
+- Multiplier: `SNAKE_WAYS_RETRY_DELAY_MULTIPLIER=2`
+
+#### **Service Health Monitoring**
+
+Each service tracks its health status:
+
+- **Active**: Polling normally
+- **Stopped**: Stopped due to failures
+- **Error**: Temporary error state
+
+### **🔧 Troubleshooting Snake Ways Integration**
+
+#### **Check Service Status**
+
+Monitor logs for service health:
+
+```bash
+# View live logs
+docker compose logs -f canopus-api
+
+# Or for local development
+pnpm run start:dev
+```
+
+#### **Common Issues & Solutions**
+
+1. **Connection Refused**
+
+   ```
+   Error: Snake Ways service connection refused
+   Solution: Check SNAKE_WAYS_BASE_URL and ensure the service is running
+   ```
+
+2. **Authentication Failed**
+
+   ```
+   Error: 401 Unauthorized
+   Solution: Verify SNAKE_WAYS_API_KEY, SNAKE_WAYS_USERNAME, and SNAKE_WAYS_PASSWORD
+   ```
+
+3. **Polling Stopped**
+
+   ```
+   Error: Polling stopped due to consecutive failures
+   Solution: Use restart-polling endpoints or check service connectivity
+   ```
+
+4. **Timeout Issues**
+   ```
+   Error: Request timeout
+   Solution: Increase SNAKE_WAYS_TIMEOUT or check network connectivity
+   ```
+
+#### **Debug Mode**
+
+Enable detailed logging for Snake Ways integration:
+
+```bash
+SNAKE_WAYS_DEBUG=true
 ```
 
 ---
@@ -169,6 +590,8 @@ enum InterfaceType {
 ### **Base URL**: `http://localhost:4000`
 
 ### **Swagger Documentation**: `http://localhost:4000/api`
+
+### **Health Check**: `http://localhost:4000/health`
 
 ### **Authentication** (`/auth`)
 
@@ -182,12 +605,14 @@ GET    /auth/profile          # Get current user profile
 ### **User Management** (`/users`)
 
 ```bash
-GET    /users                 # Get all users from database
-GET    /users/snake-ways      # Get users directly from Snake Ways
-POST   /users/sync            # Force sync with Snake Ways
-POST   /users/restart-polling # Restart Snake Ways polling
-GET    /users/history         # Get user history snapshots
-GET    /users/history/:userId # Get specific user history
+GET    /users                      # Get all users from database
+GET    /users/snake-ways           # Get users directly from Snake Ways
+GET    /users/snake-ways/with-usage # Get users with usage from Snake Ways
+POST   /users/sync                 # Force sync with Snake Ways
+POST   /users/restart-polling      # Restart Snake Ways user polling
+POST   /users/restart-snapshots-polling # Restart user snapshots polling
+GET    /users/history              # Get user history snapshots
+GET    /users/history/:userId      # Get specific user history
 ```
 
 ### **WAN Management** (`/wans`)
@@ -237,247 +662,32 @@ POST   /interfaces/sync       # Force sync with Snake Ways
 POST   /interfaces/restart-polling # Restart interface polling
 ```
 
-### **Usage Analytics** (`/wan-usage`)
+### **Usage Analytics** (`/wan-usage`, `/lan-usage`)
 
 ```bash
-GET    /wan-usage             # Get WAN usage data with filters
-GET    /wan-usage/chart/:period # Get chart data (daily/weekly/monthly)
-GET    /wan-usage/aggregated/:period # Get aggregated usage data
+# WAN Usage
+GET    /wan-usage                      # Get WAN usage data with filters
+GET    /wan-usage/chart/:period        # Get chart data (daily/weekly/monthly)
+GET    /wan-usage/aggregated/:period   # Get aggregated usage data
+POST   /wan-usage/restart-polling      # Restart WAN usage polling
+
+# LAN Usage
+GET    /lan-usage                      # Get LAN usage data with filters
+POST   /lan-usage/restart-polling      # Restart LAN usage polling
 ```
 
 #### **Usage Query Parameters**
 
 ```bash
-# Filtering options for /wan-usage
+# Filtering options for usage endpoints
 ?wanId=<wan-id>           # Filter by specific WAN
+?lanId=<lan-id>           # Filter by specific LAN
 ?startDate=2023-01-01     # Start date (inclusive)
 ?endDate=2023-12-31       # End date (inclusive)
 ?limit=100                # Limit results
 
 # Chart data with multiple WANs
 /wan-usage/chart/daily?wanIds=wan1,wan2,wan3
-```
-
----
-
-## 🔧 **Development Commands**
-
-### **Database Management**
-
-```bash
-# Database lifecycle
-pnpm run db:dev:restart     # Restart database container
-pnpm run db:dev:rm          # Remove database container
-pnpm run db:dev:up          # Start database container
-pnpm run prisma:dev:deploy  # Run migrations
-
-# Prisma commands
-npx prisma generate         # Generate Prisma client
-npx prisma migrate dev      # Create and apply migration
-npx prisma studio           # Database GUI
-npx prisma db seed          # Seed database
-```
-
-### **Application Commands**
-
-```bash
-# Development
-pnpm run start:dev          # Hot reload development
-pnpm run start:debug        # Debug mode with inspector
-
-# Building & Production
-pnpm run build              # Build for production
-pnpm run start:prod         # Start production build
-pnpm run start:migrate:deploy # Deploy migrations + start prod
-
-# Code Quality
-pnpm run lint               # Run ESLint
-pnpm run format             # Format with Prettier
-pnpm run test               # Run unit tests
-pnpm run test:e2e           # Run end-to-end tests
-pnpm run test:cov           # Test coverage report
-```
-
----
-
-## 🏛️ **Architecture Overview**
-
-### **Module Structure**
-
-```
-src/
-├── auth/                   # Authentication & authorization
-├── user/                   # User management
-├── wan/                    # WAN management & usage tracking
-├── lan/                    # LAN management
-├── interface/              # Network interface management
-├── dashboard/              # Dashboard endpoints (placeholder)
-├── snake-ways/             # Snake Ways service integration
-│   ├── base/              # Shared Snake Ways functionality
-│   ├── user/              # User sync service
-│   ├── wan/               # WAN sync service
-│   ├── lan/               # LAN sync service
-│   └── interface/         # Interface sync service
-├── common/                 # Shared utilities & pipes
-├── prisma/                 # Database client
-└── main.ts                # Application bootstrap
-```
-
-### **Key Design Patterns**
-
-#### **Service Layer Architecture**
-
-- **Controller**: HTTP request handling & validation
-- **Service**: Business logic & data orchestration
-- **Repository**: Database operations (Prisma)
-- **Snake Ways Services**: External API integration
-
-#### **Data Synchronization**
-
-- **Polling Strategy**: Configurable intervals for each data type
-- **Resilient Sync**: Automatic retry with exponential backoff
-- **Data Mapping**: Clean separation between external API and internal models
-- **Error Handling**: Comprehensive logging and graceful degradation
-
-#### **Authentication Flow**
-
-```
-1. User login → JWT access token + HTTP-only refresh cookie
-2. Protected routes → JWT verification middleware
-3. Token refresh → Automatic via refresh token rotation
-4. Logout → Token invalidation + cookie clearing
-```
-
----
-
-## 🔌 **Snake Ways Integration**
-
-### **Service Architecture**
-
-Each data type has its own synchronized service:
-
-- **`SnakeWaysUserService`**: User synchronization
-- **`SnakeWaysWanService`**: WAN data & route control
-- **`SnakeWaysLanService`**: LAN configuration sync
-- **`SnakeWaysInterfaceService`**: Network interface monitoring
-
-### **Polling Configuration**
-
-```typescript
-// Environment variables control polling intervals
-SNAKE_WAYS_USER_POLLING_INTERVAL = 5; // minutes
-SNAKE_WAYS_WAN_POLLING_INTERVAL = 5; // minutes
-SNAKE_WAYS_LAN_POLLING_INTERVAL = 5; // minutes
-SNAKE_WAYS_INTERFACE_POLLING_INTERVAL = 5; // minutes
-```
-
-### **Data Flow**
-
-```
-Snake Ways API → Service Layer → Data Mapping → Database → REST API
-```
-
-### **Error Handling & Resilience**
-
-- **Circuit Breaker**: Stops polling on consecutive failures
-- **Exponential Backoff**: Increasing delays between retries
-- **Service Health**: Individual service status tracking
-- **Manual Recovery**: Force sync and restart polling endpoints
-
----
-
-## 📱 **API Documentation (Swagger)**
-
-### **Accessing Swagger UI**
-
-Visit `http://localhost:4000/api` for interactive API documentation.
-
-### **Key Features**
-
-- **Interactive Testing**: Execute API calls directly from the browser
-- **Request/Response Examples**: Complete payload examples for all endpoints
-- **Authentication**: JWT bearer token input for protected routes
-- **Schema Documentation**: Detailed models and validation rules
-- **Error Responses**: Comprehensive error code documentation
-
-### **Swagger Configuration**
-
-```typescript
-// Configured in src/main.ts
-const config = new DocumentBuilder()
-  .setTitle('Canopus API')
-  .setDescription('API for Canopus Network Management')
-  .setVersion('1.0')
-  .addBearerAuth() // JWT authentication
-  .build();
-```
-
----
-
-## 🔐 **Security & Authentication**
-
-### **JWT Implementation**
-
-- **Access Tokens**: Short-lived (15 minutes), stateless
-- **Refresh Tokens**: Long-lived (7 days), stored as HTTP-only cookies
-- **Token Rotation**: New refresh token on each refresh operation
-- **Secure Cookies**: HTTP-only, secure, SameSite strict
-
-### **Route Protection**
-
-```typescript
-// Global JWT guard applied to all routes by default
-// Use @Public() decorator for open endpoints
-@Public()
-@Post('signin')
-async signIn() { ... }
-
-// Access current user in protected routes
-@Get('profile')
-getProfile(@GetCurrentUser() user: UserEntity) { ... }
-```
-
-### **CORS Configuration**
-
-```typescript
-// Configured for frontend integration
-app.enableCors({
-  origin: ['http://localhost:3000'],
-  credentials: true, // Allow cookies
-});
-```
-
----
-
-## 🐳 **Docker & Deployment**
-
-### **Development with Docker Compose**
-
-```bash
-# Start development database
-docker-compose up canopus-dev-db -d
-
-# Full application stack (uncomment in docker-compose.yml)
-docker-compose up -d
-```
-
-### **Production Deployment**
-
-```bash
-# Build production image
-docker build -t canopus-backend .
-
-# Deploy with migrations
-docker run -e DATABASE_URL=... canopus-backend npm run start:migrate:deploy
-```
-
-### **Environment Variables for Production**
-
-```bash
-NODE_ENV=production
-DATABASE_URL=postgresql://user:pass@host:5432/db
-JWT_SECRET=production-secret
-SNAKE_WAYS_BASE_URL=https://production-snake-ways-api
 ```
 
 ---
@@ -500,14 +710,33 @@ pnpm run test:cov
 pnpm run test:watch
 ```
 
-### **Test Structure**
+### **Testing with Docker**
 
+```bash
+# Run tests in Docker container
+docker compose exec canopus-api pnpm run test
+
+# Run e2e tests
+docker compose exec canopus-api pnpm run test:e2e
 ```
-test/
-├── unit/                   # Unit tests
-├── integration/            # Integration tests
-└── e2e/                   # End-to-end tests
-```
+
+---
+
+## 📱 **API Documentation (Swagger)**
+
+### **Accessing Swagger UI**
+
+- **Local Development**: `http://localhost:4000/api`
+- **Docker Production**: `http://localhost:4000/api`
+- **Docker Development**: `http://localhost:4001/api`
+
+### **Key Features**
+
+- **Interactive Testing**: Execute API calls directly from the browser
+- **Authentication**: JWT bearer token input for protected routes
+- **Request/Response Examples**: Complete payload examples
+- **Schema Documentation**: Detailed models and validation rules
+- **Snake Ways Integration**: Documented endpoints for all services
 
 ---
 
@@ -519,16 +748,19 @@ test/
 2. **Add Controller Methods** with Swagger decorators
 3. **Implement Service Logic**
 4. **Update Database Schema** (if needed)
-5. **Run Migrations**: `npx prisma migrate dev`
+5. **Run Migrations**: `pnpm run prisma:migrate`
 
-### **Database Changes**
+### **Database Schema Changes**
 
 ```bash
 # 1. Modify prisma/schema.prisma
-# 2. Generate migration
-npx prisma migrate dev --name your-migration-name
-# 3. Generate new client
-npx prisma generate
+# 2. Create and apply migration
+pnpm run prisma:migrate
+
+# 3. Generate new Prisma client
+pnpm run prisma:generate
+
+# 4. Restart development server or rebuild Docker
 ```
 
 ### **Adding Snake Ways Integration**
@@ -537,6 +769,7 @@ npx prisma generate
 2. **Implement Polling Logic** with configurable intervals
 3. **Add Data Mapping** between Snake Ways and internal models
 4. **Configure Environment Variables** for polling intervals
+5. **Add Force Sync and Restart Endpoints**
 
 ---
 
@@ -548,24 +781,45 @@ npx prisma generate
 
 ```bash
 # Check if database container is running
-docker ps | grep canopus-dev-db
+docker ps | grep canopus-postgres
 
 # Restart database
 pnpm run db:dev:restart
 
 # Check connection
-npx prisma db pull
+pnpm run prisma:generate
 ```
 
-#### **Snake Ways Service Unavailable**
+#### **Docker Issues**
 
 ```bash
-# Check service status in logs
-# Look for polling restart endpoints:
+# Check container status
+docker compose ps
+
+# View container logs
+docker compose logs canopus-api
+
+# Rebuild containers
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+#### **Snake Ways Service Issues**
+
+```bash
+# Check service connectivity
+curl http://your-snake-ways-service-url/health
+
+# Restart specific polling services
 POST /users/restart-polling
 POST /wans/restart-polling
 POST /lans/restart-polling
-POST /interfaces/restart-polling
+
+# Force sync specific data
+POST /users/sync
+POST /wans/sync
+POST /lans/sync
 ```
 
 #### **Authentication Issues**
@@ -574,16 +828,23 @@ POST /interfaces/restart-polling
 # Verify JWT secrets are set
 echo $JWT_SECRET
 
-# Check token expiration in client
+# Check token expiration in logs
 # Use /auth/refresh endpoint for new tokens
 ```
 
-### **Logging & Debugging**
+### **Production Deployment Checklist**
 
-- **Colored Logs**: Chalk-based logging with different colors per severity
-- **Request Logging**: HTTP requests automatically logged
-- **Service Health**: Individual service status in logs
-- **Debug Mode**: `pnpm run start:debug` for Node.js inspector
+- [ ] Set `NODE_ENV=production`
+- [ ] Configure strong JWT secrets (32+ characters)
+- [ ] Set up production database with proper credentials
+- [ ] Configure Snake Ways service URL and credentials
+- [ ] Set appropriate CORS origins
+- [ ] Enable HTTPS and set `COOKIE_SECURE=true`
+- [ ] Configure monitoring and logging
+- [ ] Set up backup strategy for database
+- [ ] Configure proper resource limits in Docker
+- [ ] Test all Snake Ways integrations
+- [ ] Verify health check endpoints
 
 ---
 
@@ -591,5 +852,23 @@ echo $JWT_SECRET
 
 - **NestJS Documentation**: https://docs.nestjs.com
 - **Prisma Documentation**: https://www.prisma.io/docs
+- **Docker Documentation**: https://docs.docker.com
 - **PostgreSQL Documentation**: https://www.postgresql.org/docs
 - **JWT Best Practices**: https://auth0.com/blog/a-look-at-the-latest-draft-for-jwt-bcp
+
+---
+
+## 🤝 **Contributing**
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Update documentation
+6. Submit a pull request
+
+---
+
+## 📄 **License**
+
+This project is licensed under the UNLICENSED License.

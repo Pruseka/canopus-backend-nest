@@ -4,6 +4,7 @@ import {
   Logger,
   Param,
   ParseArrayPipe,
+  Post,
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -73,6 +74,25 @@ export class WanUsageController {
       `Getting ${period} chart data for WANs: ${wanIds?.join(', ') || 'all'}`,
     );
     return this.wanUsageService.getWanUsageChartData(period, wanIds);
+  }
+
+  @Post('restart-polling')
+  @ApiResponse({
+    status: 200,
+    description: 'Restart Snake Ways polling if it has stopped',
+    schema: {
+      type: 'object',
+      properties: {
+        restarted: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Polling restarted successfully' },
+      },
+    },
+  })
+  @ApiOperation({
+    summary: 'Restart Snake Ways polling if it has stopped',
+  })
+  async restartPolling(): Promise<{ restarted: boolean; message: string }> {
+    return await this.wanUsageService.restartPolling();
   }
 
   //! Unused in the UI

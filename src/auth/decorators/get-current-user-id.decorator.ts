@@ -5,6 +5,7 @@ import { UserEntity } from 'src/user/entities';
 export const GetCurrentUserId = createParamDecorator(
   (data: unknown, context: ExecutionContext): string => {
     const request: Request = context.switchToHttp().getRequest();
-    return request.user && request.user['sub'];
+    const user = request.user as UserEntity;
+    return user?.id || '';
   },
 );

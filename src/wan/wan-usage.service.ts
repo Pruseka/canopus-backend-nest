@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   endOfDay,
   endOfMonth,
+  isSameMonth,
   startOfDay,
   startOfMonth,
   subDays,
@@ -275,24 +276,82 @@ export class WanUsageService {
               const firstRecord = periodRecords[0];
               const lastRecord = periodRecords[periodRecords.length - 1];
 
-              // Keep as BigInt for calculation to avoid precision loss
-              const lastBytes =
-                typeof lastRecord.bytes === 'bigint'
-                  ? lastRecord.bytes
-                  : BigInt(lastRecord.bytes);
-              const firstBytes =
-                typeof firstRecord.bytes === 'bigint'
-                  ? firstRecord.bytes
-                  : BigInt(firstRecord.bytes);
-              const usageBigInt = lastBytes - firstBytes;
+              const isWithinSameMonth = isSameMonth(
+                firstRecord.snapshotDate,
+                lastRecord.snapshotDate,
+              );
 
-              // Convert to Number only at the end
-              const usage = Number(usageBigInt);
-              const safeUsage = usage < 0 ? 0 : usage; // Prevent negative usage
+              if (period === 'weekly' && !isWithinSameMonth) {
+                const recordsOfStartMonth = periodRecords
+                  .filter((record) =>
+                    isSameMonth(record.snapshotDate, firstRecord.snapshotDate),
+                  )
+                  .sort(
+                    (a, b) =>
+                      a.snapshotDate.getTime() - b.snapshotDate.getTime(),
+                  );
+                const recordsOfEndMonth = periodRecords
+                  .filter((record) =>
+                    isSameMonth(record.snapshotDate, lastRecord.snapshotDate),
+                  )
+                  .sort(
+                    (a, b) =>
+                      a.snapshotDate.getTime() - b.snapshotDate.getTime(),
+                  );
 
-              // Add usage to chart data with WAN name as key
-              chartData[i][wanName] = safeUsage;
-              totalBytes += safeUsage;
+                const firstRecordOfStartMonth = recordsOfStartMonth[0];
+                const firstRecordOfEndMonth = recordsOfEndMonth[0];
+                const lastRecordOfStartMonth =
+                  recordsOfStartMonth[recordsOfStartMonth.length - 1];
+                const lastRecordOfEndMonth =
+                  recordsOfEndMonth[recordsOfEndMonth.length - 1];
+
+                const firstRecordOfStartMonthBytes =
+                  typeof firstRecordOfStartMonth.bytes === 'bigint'
+                    ? firstRecordOfStartMonth.bytes
+                    : BigInt(firstRecordOfStartMonth.bytes || 0);
+                const firstRecordOfEndMonthBytes =
+                  typeof firstRecordOfEndMonth.bytes === 'bigint'
+                    ? firstRecordOfEndMonth.bytes
+                    : BigInt(firstRecordOfEndMonth.bytes || 0);
+                const lastRecordOfStartMonthBytes =
+                  typeof lastRecordOfStartMonth.bytes === 'bigint'
+                    ? lastRecordOfStartMonth.bytes
+                    : BigInt(lastRecordOfStartMonth.bytes || 0);
+                const lastRecordOfEndMonthBytes =
+                  typeof lastRecordOfEndMonth.bytes === 'bigint'
+                    ? lastRecordOfEndMonth.bytes
+                    : BigInt(lastRecordOfEndMonth.bytes || 0);
+
+                const firstMonthUsage = Math.abs(
+                  Number(
+                    lastRecordOfStartMonthBytes - firstRecordOfStartMonthBytes,
+                  ),
+                );
+                const lastMonthUsage = Math.abs(
+                  Number(
+                    lastRecordOfEndMonthBytes - firstRecordOfEndMonthBytes,
+                  ),
+                );
+                const totalUsage = firstMonthUsage + lastMonthUsage;
+                chartData[i][wanName] = totalUsage;
+                totalBytes += totalUsage;
+              } else {
+                // Keep as BigInt for calculation to avoid precision loss
+                const lastBytes =
+                  typeof lastRecord.bytes === 'bigint'
+                    ? lastRecord.bytes
+                    : BigInt(lastRecord.bytes);
+                const firstBytes =
+                  typeof firstRecord.bytes === 'bigint'
+                    ? firstRecord.bytes
+                    : BigInt(firstRecord.bytes);
+                const totalUsage = Math.abs(Number(lastBytes - firstBytes));
+
+                // Add usage to chart data with WAN name as key
+                chartData[i][wanName] = totalUsage;
+                totalBytes += totalUsage;
+              }
             }
           }
         }
@@ -314,6 +373,57 @@ export class WanUsageService {
     } catch (error) {
       this.logger.error(chalk.red('Failed to get WAN usage chart data'), error);
       throw new Error(`Failed to get WAN usage chart data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Attempt to restart Snake Ways polling if it has stopped
+   * @returns Object indicating if polling was restarted and a status message
+   */
+  async restartPolling(): Promise<{ restarted: boolean; message: string }> {
+    try {
+      this.logger.log(
+        chalk.cyan(
+          'Attempting to restart Snake Ways WAN Usage service polling',
+        ),
+      );
+
+      const wasRestarted =
+        await this.snakeWaysWanUsageService.restartPollingIfStopped();
+
+      if (wasRestarted) {
+        this.logger.log(
+          chalk.green.bold(
+            'Snake Ways WAN Usage service polling restarted successfully',
+          ),
+        );
+        return {
+          restarted: true,
+          message: 'Polling restarted successfully',
+        };
+      } else {
+        this.logger.log(
+          chalk.yellow(
+            'Snake Ways WAN service polling was already active, no restart needed',
+          ),
+        );
+        return {
+          restarted: false,
+          message:
+            'WAN Usage service polling was already active, no restart needed',
+        };
+      }
+    } catch (error) {
+      this.logger.error(
+        chalk.red.bold(
+          'Failed to restart Snake Ways WAN Usage service polling',
+        ),
+        error,
+      );
+      return {
+        restarted: false,
+        message: `Failed to restart WAN Usage service polling: ${error.message}`,
+      };
     }
   }
 

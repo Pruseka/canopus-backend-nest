@@ -23,6 +23,7 @@ import {
   endOfHour,
   endOfDay,
   endOfMonth,
+  isSameMonth,
 } from 'date-fns';
 import { WanUsageEntity } from '../../wan/entities/wan-usage.entity';
 const chalk = require('chalk');
@@ -541,10 +542,62 @@ export class SnakeWaysWanUsageService
 
         // Calculate total bytes used in this period
         // We use the difference between the last and first record
-        const totalBytes = Number(lastRecord.bytes) - Number(firstRecord.bytes);
-        const maxBytes = Number(lastRecord.maxBytes);
-        const usagePercentage =
-          maxBytes > 0 ? (totalBytes / maxBytes) * 100 : 0;
+        let totalBytes: number;
+        let maxBytes: number;
+        let usagePercentage: number;
+        const isWithinSameMonth = isSameMonth(
+          firstRecord.snapshotDate,
+          lastRecord.snapshotDate,
+        );
+
+        // Handle weekly aggregation across month boundaries
+        // eg. if the period is weekly and the first record is in January and the last record is in February, we need to aggregate the usage for both months
+        if (period === 'weekly' && !isWithinSameMonth) {
+          const recordsOfStartMonth = records
+            .filter((record) =>
+              isSameMonth(record.snapshotDate, firstRecord.snapshotDate),
+            )
+            .sort(
+              (a, b) => a.snapshotDate.getTime() - b.snapshotDate.getTime(),
+            );
+          const recordsOfEndMonth = records
+            .filter((record) =>
+              isSameMonth(record.snapshotDate, lastRecord.snapshotDate),
+            )
+            .sort(
+              (a, b) => a.snapshotDate.getTime() - b.snapshotDate.getTime(),
+            );
+
+          const firstRecordOfStartMonth = recordsOfStartMonth[0];
+          const firstRecordOfEndMonth = recordsOfEndMonth[0];
+          const lastRecordOfStartMonth =
+            recordsOfStartMonth[recordsOfStartMonth.length - 1];
+          const lastRecordOfEndMonth =
+            recordsOfEndMonth[recordsOfEndMonth.length - 1];
+
+          const firstMonthUsage =
+            Number(lastRecordOfStartMonth.bytes) -
+            Number(firstRecordOfStartMonth.bytes);
+          const lastMonthUsage =
+            Number(lastRecordOfEndMonth.bytes) -
+            Number(firstRecordOfEndMonth.bytes);
+
+          totalBytes = Math.abs(firstMonthUsage + lastMonthUsage);
+          maxBytes = Number(lastRecordOfEndMonth.maxBytes);
+          usagePercentage = maxBytes > 0 ? (totalBytes / maxBytes) * 100 : 0;
+        } else {
+          const firstBytes =
+            typeof firstRecord.bytes === 'bigint'
+              ? firstRecord.bytes
+              : BigInt(firstRecord.bytes || 0);
+          const lastBytes =
+            typeof lastRecord.bytes === 'bigint'
+              ? lastRecord.bytes
+              : BigInt(lastRecord.bytes || 0);
+          totalBytes = Math.abs(Number(lastBytes) - Number(firstBytes));
+          maxBytes = Number(lastRecord.maxBytes);
+          usagePercentage = maxBytes > 0 ? (totalBytes / maxBytes) * 100 : 0;
+        }
 
         // Format bytes for display
         const formatBytes = (bytes: number): string => {

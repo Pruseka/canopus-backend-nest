@@ -354,7 +354,7 @@ export class SnakeWaysLanService
 
     return {
       where: {
-        lanId: swLan.LanID,
+        id: swLan.LanID,
       },
       update: {
         lanName: swLan.LanName,
@@ -371,7 +371,7 @@ export class SnakeWaysLanService
         updatedAt: new Date(),
       },
       create: {
-        lanId: swLan.LanID,
+        id: swLan.LanID,
         lanName: swLan.LanName,
         ipAddress: swLan.IpAddress,
         subnetmask: swLan.Subnetmask,
