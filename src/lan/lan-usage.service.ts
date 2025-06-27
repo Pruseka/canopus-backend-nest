@@ -105,30 +105,48 @@ export class LanUsageService {
 
       for (const [lanId, lanRecords] of Object.entries(groupedByLan)) {
         if (lanRecords.length >= 2) {
-          // Calculate usage: last record - first record in the date range
-          const firstRecord = lanRecords[0];
+          // Sort records chronologically to ensure proper order
+          lanRecords.sort(
+            (a, b) =>
+              new Date(a.snapshotDate).getTime() -
+              new Date(b.snapshotDate).getTime(),
+          );
+
           const lastRecord = lanRecords[lanRecords.length - 1];
 
-          // Calculate bytes usage
-          const firstBytes =
-            typeof firstRecord.bytes === 'bigint'
-              ? firstRecord.bytes
-              : BigInt(firstRecord.bytes || 0);
-          const lastBytes =
-            typeof lastRecord.bytes === 'bigint'
-              ? lastRecord.bytes
-              : BigInt(lastRecord.bytes || 0);
+          // Calculate total usage by processing all records chronologically
+          let accumulatedUsage = 0;
 
-          // Usage = last - first (since bytes accumulate over time)
-          const usageBigInt = lastBytes - firstBytes;
-          const usage = Number(usageBigInt);
-          const safeUsage = usage < 0 ? 0 : usage;
+          // Process records in chronological order to track changes
+          for (let i = 1; i < lanRecords.length; i++) {
+            const prevRecord = lanRecords[i - 1];
+            const currentRecord = lanRecords[i];
+
+            // Calculate period usage (what happened between prev and current record)
+            const prevBytes =
+              typeof prevRecord.bytes === 'bigint'
+                ? prevRecord.bytes
+                : BigInt(prevRecord.bytes || 0);
+            const currentBytes =
+              typeof currentRecord.bytes === 'bigint'
+                ? currentRecord.bytes
+                : BigInt(currentRecord.bytes || 0);
+
+            // Usage = current - prev (since bytes accumulate over time)
+            const periodUsageBigInt = currentBytes - prevBytes;
+            const periodUsage = Number(periodUsageBigInt);
+
+            // Only accumulate positive values (actual usage)
+            if (periodUsage > 0) {
+              accumulatedUsage += periodUsage;
+            }
+          }
 
           // Add the last record with calculated usage info
           enhancedRecords.push({
             ...lastRecord,
-            calculatedUsage: safeUsage,
-            formattedUsage: this.formatBytes(safeUsage),
+            calculatedUsage: accumulatedUsage,
+            formattedUsage: this.formatBytes(accumulatedUsage),
           });
         } else if (lanRecords.length === 1) {
           // If only one record, add it without usage calculation
@@ -253,72 +271,46 @@ export class LanUsageService {
         let enhancedUsageRecords: any[] = [];
 
         if (usageRecords.length >= 2) {
-          // Calculate usage: last record - first record in the date range
-          const firstRecord = usageRecords[0];
-          const lastRecord = usageRecords[usageRecords.length - 1];
-
-          const isWithinSameMonth = isSameMonth(
-            firstRecord.snapshotDate,
-            lastRecord.snapshotDate,
+          // Sort records chronologically to ensure proper order
+          usageRecords.sort(
+            (a, b) =>
+              new Date(a.snapshotDate).getTime() -
+              new Date(b.snapshotDate).getTime(),
           );
 
-          if (isWithinSameMonth) {
-            // Calculate bytes usage
-            const firstBytes =
-              typeof firstRecord.bytes === 'bigint'
-                ? firstRecord.bytes
-                : BigInt(firstRecord.bytes || 0);
-            const lastBytes =
-              typeof lastRecord.bytes === 'bigint'
-                ? lastRecord.bytes
-                : BigInt(lastRecord.bytes || 0);
+          const lastRecord = usageRecords[usageRecords.length - 1];
 
-            // Usage = last - first (since bytes accumulate over time)
-            const usageBigInt = lastBytes - firstBytes;
-            totalBytes = Math.abs(Number(usageBigInt));
+          // Calculate total usage by processing all records chronologically
+          let accumulatedUsage = 0;
 
-            // Add the last record with calculated usage info
-          } else {
-            const recordsOfStartMonth = usageRecords.filter((record) =>
-              isSameMonth(record.snapshotDate, firstRecord.snapshotDate),
-            );
-            const recordsOfEndMonth = usageRecords.filter((record) =>
-              isSameMonth(record.snapshotDate, lastRecord.snapshotDate),
-            );
+          // Process records in chronological order to track changes
+          for (let i = 1; i < usageRecords.length; i++) {
+            const prevRecord = usageRecords[i - 1];
+            const currentRecord = usageRecords[i];
 
-            const firstRecordOfStartMonth = recordsOfStartMonth[0];
-            const firstRecordOfEndMonth = recordsOfEndMonth[0];
-            const lastRecordOfStartMonth =
-              recordsOfStartMonth[recordsOfStartMonth.length - 1];
-            const lastRecordOfEndMonth =
-              recordsOfEndMonth[recordsOfEndMonth.length - 1];
+            // Calculate period usage (what happened between prev and current record)
+            const prevBytes =
+              typeof prevRecord.bytes === 'bigint'
+                ? prevRecord.bytes
+                : BigInt(prevRecord.bytes || 0);
+            const currentBytes =
+              typeof currentRecord.bytes === 'bigint'
+                ? currentRecord.bytes
+                : BigInt(currentRecord.bytes || 0);
 
-            const firstRecordOfStartMonthBytes =
-              typeof firstRecordOfStartMonth.bytes === 'bigint'
-                ? firstRecordOfStartMonth.bytes
-                : BigInt(firstRecordOfStartMonth.bytes || 0);
-            const firstRecordOfEndMonthBytes =
-              typeof firstRecordOfEndMonth.bytes === 'bigint'
-                ? firstRecordOfEndMonth.bytes
-                : BigInt(firstRecordOfEndMonth.bytes || 0);
-            const lastRecordOfStartMonthBytes =
-              typeof lastRecordOfStartMonth.bytes === 'bigint'
-                ? lastRecordOfStartMonth.bytes
-                : BigInt(lastRecordOfStartMonth.bytes || 0);
-            const lastRecordOfEndMonthBytes =
-              typeof lastRecordOfEndMonth.bytes === 'bigint'
-                ? lastRecordOfEndMonth.bytes
-                : BigInt(lastRecordOfEndMonth.bytes || 0);
+            // Usage = current - prev (since bytes accumulate over time)
+            const periodUsageBigInt = currentBytes - prevBytes;
+            const periodUsage = Number(periodUsageBigInt);
 
-            const firstMonthUsage = Number(
-              lastRecordOfStartMonthBytes - firstRecordOfStartMonthBytes,
-            );
-            const lastMonthUsage = Number(
-              lastRecordOfEndMonthBytes - firstRecordOfEndMonthBytes,
-            );
-
-            totalBytes = Math.abs(firstMonthUsage + lastMonthUsage);
+            // Only accumulate positive values (actual usage)
+            if (periodUsage > 0) {
+              accumulatedUsage += periodUsage;
+            }
           }
+
+          totalBytes = accumulatedUsage;
+
+          // Add enhanced record with calculated total usage
           enhancedUsageRecords.push({
             ...lastRecord,
             calculatedUsage: totalBytes,

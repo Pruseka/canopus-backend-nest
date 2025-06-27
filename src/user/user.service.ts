@@ -219,184 +219,86 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
 
       for (const [userId, userSnapshots] of Object.entries(groupedByUser)) {
         if (userSnapshots.length >= 2) {
-          // Calculate usage: first snapshot - last snapshot in the date range
+          // Sort snapshots chronologically
+          userSnapshots.sort(
+            (a, b) =>
+              new Date(a.snapshotDate).getTime() -
+              new Date(b.snapshotDate).getTime(),
+          );
+
           const firstSnapshot = userSnapshots[0];
           const lastSnapshot = userSnapshots[userSnapshots.length - 1];
 
-          // Check if snapshots are within the same month
-          const isWithinSameMonth = isSameMonth(
-            firstSnapshot.snapshotDate,
-            lastSnapshot.snapshotDate,
-          );
+          // Calculate usage by processing all snapshots chronologically
+          let totalDataUsage = 0;
+          let totalTimeUsage = 0;
+          let totalAutoCreditUsage = 0;
+          let totalUsageDebit = 0;
+          let totalUsageCredit = 0;
+          let totalUsageQuota = 0;
 
-          let safeDataUsage = 0;
-          let safeTimeUsage = 0;
-          let safeAutoCreditUsage = 0;
-          let safeUsageDebitDiff = 0;
-          let safeUsageCreditDiff = 0;
-          let safeUsageQuotaDiff = 0;
+          // Process snapshots in chronological order to track changes
+          for (let i = 1; i < userSnapshots.length; i++) {
+            const prevSnapshot = userSnapshots[i - 1];
+            const currentSnapshot = userSnapshots[i];
 
-          if (isWithinSameMonth) {
-            // Normal calculation for same month
-            safeDataUsage = Math.abs(
-              this.calculateCreditUsage(
-                firstSnapshot.dataCredit,
-                lastSnapshot.dataCredit,
-              ),
+            // Calculate period usage (what happened between prev and current snapshot)
+            const periodDataUsage = this.calculateCreditUsage(
+              prevSnapshot.dataCredit,
+              currentSnapshot.dataCredit,
             );
-            safeTimeUsage = Math.abs(
-              this.calculateCreditUsage(
-                firstSnapshot.timeCredit,
-                lastSnapshot.timeCredit,
-              ),
+            const periodTimeUsage = this.calculateCreditUsage(
+              prevSnapshot.timeCredit,
+              currentSnapshot.timeCredit,
             );
-            safeAutoCreditUsage = Math.abs(
-              this.calculateDebitUsage(
-                firstSnapshot.autocreditValue,
-                lastSnapshot.autocreditValue,
-              ),
+            const periodAutoCreditUsage = this.calculateDebitUsage(
+              prevSnapshot.autocreditValue,
+              currentSnapshot.autocreditValue,
             );
-            safeUsageDebitDiff = Math.abs(
-              this.calculateDebitUsage(
-                firstSnapshot.usageDebit,
-                lastSnapshot.usageDebit,
-              ),
+            const periodUsageDebit = this.calculateDebitUsage(
+              prevSnapshot.usageDebit,
+              currentSnapshot.usageDebit,
             );
-            safeUsageCreditDiff = Math.abs(
-              this.calculateCreditUsage(
-                firstSnapshot.usageCredit,
-                lastSnapshot.usageCredit,
-              ),
+            const periodUsageCredit = this.calculateCreditUsage(
+              prevSnapshot.usageCredit,
+              currentSnapshot.usageCredit,
             );
-            safeUsageQuotaDiff = Math.abs(
-              this.calculateDebitUsage(
-                firstSnapshot.usageQuota,
-                lastSnapshot.usageQuota,
-              ),
-            );
-          } else {
-            // Cross-month calculation
-            const snapshotsOfStartMonth = userSnapshots.filter((snapshot) =>
-              isSameMonth(snapshot.snapshotDate, firstSnapshot.snapshotDate),
-            );
-            const snapshotsOfEndMonth = userSnapshots.filter((snapshot) =>
-              isSameMonth(snapshot.snapshotDate, lastSnapshot.snapshotDate),
+            const periodUsageQuota = this.calculateDebitUsage(
+              prevSnapshot.usageQuota,
+              currentSnapshot.usageQuota,
             );
 
-            const firstSnapshotOfStartMonth = snapshotsOfStartMonth[0];
-            const firstSnapshotOfEndMonth = snapshotsOfEndMonth[0];
-            const lastSnapshotOfStartMonth =
-              snapshotsOfStartMonth[snapshotsOfStartMonth.length - 1];
-            const lastSnapshotOfEndMonth =
-              snapshotsOfEndMonth[snapshotsOfEndMonth.length - 1];
-
-            // Calculate for each month and sum
-            const startMonthDataUsage = this.calculateCreditUsage(
-              firstSnapshotOfStartMonth.dataCredit,
-              lastSnapshotOfStartMonth.dataCredit,
-            );
-            const endMonthDataUsage = this.calculateCreditUsage(
-              firstSnapshotOfEndMonth.dataCredit,
-              lastSnapshotOfEndMonth.dataCredit,
-            );
-            safeDataUsage = Math.abs(startMonthDataUsage + endMonthDataUsage);
-
-            const startMonthTimeUsage = this.calculateCreditUsage(
-              firstSnapshotOfStartMonth.timeCredit,
-              lastSnapshotOfStartMonth.timeCredit,
-            );
-            const endMonthTimeUsage = this.calculateCreditUsage(
-              firstSnapshotOfEndMonth.timeCredit,
-              lastSnapshotOfEndMonth.timeCredit,
-            );
-            safeTimeUsage = Math.abs(startMonthTimeUsage + endMonthTimeUsage);
-
-            const startMonthAutoCreditUsage = this.calculateDebitUsage(
-              firstSnapshotOfStartMonth.autocreditValue,
-              lastSnapshotOfStartMonth.autocreditValue,
-            );
-            const endMonthAutoCreditUsage = this.calculateDebitUsage(
-              firstSnapshotOfEndMonth.autocreditValue,
-              lastSnapshotOfEndMonth.autocreditValue,
-            );
-            safeAutoCreditUsage = Math.abs(
-              startMonthAutoCreditUsage + endMonthAutoCreditUsage,
-            );
-
-            const startMonthUsageDebit = this.calculateDebitUsage(
-              firstSnapshotOfStartMonth.usageDebit,
-              lastSnapshotOfStartMonth.usageDebit,
-            );
-            const endMonthUsageDebit = this.calculateDebitUsage(
-              firstSnapshotOfEndMonth.usageDebit,
-              lastSnapshotOfEndMonth.usageDebit,
-            );
-            safeUsageDebitDiff = Math.abs(
-              startMonthUsageDebit + endMonthUsageDebit,
-            );
-
-            const startMonthUsageCredit = this.calculateCreditUsage(
-              firstSnapshotOfStartMonth.usageCredit,
-              lastSnapshotOfStartMonth.usageCredit,
-            );
-            const endMonthUsageCredit = this.calculateCreditUsage(
-              firstSnapshotOfEndMonth.usageCredit,
-              lastSnapshotOfEndMonth.usageCredit,
-            );
-            safeUsageCreditDiff = Math.abs(
-              startMonthUsageCredit + endMonthUsageCredit,
-            );
-
-            const startMonthUsageQuota = this.calculateDebitUsage(
-              firstSnapshotOfStartMonth.usageQuota,
-              lastSnapshotOfStartMonth.usageQuota,
-            );
-            const endMonthUsageQuota = this.calculateDebitUsage(
-              firstSnapshotOfEndMonth.usageQuota,
-              lastSnapshotOfEndMonth.usageQuota,
-            );
-            safeUsageQuotaDiff = Math.abs(
-              startMonthUsageQuota + endMonthUsageQuota,
-            );
+            // Accumulate totals (only positive values represent actual usage)
+            if (periodDataUsage > 0) totalDataUsage += periodDataUsage;
+            if (periodTimeUsage > 0) totalTimeUsage += periodTimeUsage;
+            if (periodAutoCreditUsage > 0)
+              totalAutoCreditUsage += periodAutoCreditUsage;
+            if (periodUsageDebit > 0) totalUsageDebit += periodUsageDebit;
+            if (periodUsageCredit > 0) totalUsageCredit += periodUsageCredit;
+            if (periodUsageQuota > 0) totalUsageQuota += periodUsageQuota;
           }
 
-          // Add all snapshots for this user with calculated usage info
+          // Add enhanced snapshot with calculated totals
           enhancedSnapshots.push({
             ...lastSnapshot,
-            calculatedDataUsage: safeDataUsage,
-            calculatedTimeUsage: safeTimeUsage,
-            calculatedAutoCreditUsage: safeAutoCreditUsage,
-            calculatedUsageDebit: safeUsageDebitDiff,
-            calculatedUsageCredit: safeUsageCreditDiff,
-            calculatedUsageQuota: safeUsageQuotaDiff,
-            formattedDataUsage: this.formatBytes(safeDataUsage),
-            formattedTimeUsage: this.formatTime(safeTimeUsage),
-            formattedAutoCreditUsage: this.formatBytes(safeAutoCreditUsage),
-            formattedUsageDebit: this.formatBytes(safeUsageDebitDiff),
-            formattedUsageCredit: this.formatBytes(safeUsageCreditDiff),
-            formattedUsageQuota: this.formatBytes(safeUsageQuotaDiff),
+            calculatedDataUsage: totalDataUsage,
+            calculatedTimeUsage: totalTimeUsage,
+            calculatedAutoCreditUsage: totalAutoCreditUsage,
+            calculatedUsageDebit: totalUsageDebit,
+            calculatedUsageCredit: totalUsageCredit,
+            calculatedUsageQuota: totalUsageQuota,
+            formattedDataUsage: this.formatBytes(totalDataUsage),
+            formattedTimeUsage: this.formatTime(totalTimeUsage),
+            formattedAutoCreditUsage: this.formatBytes(totalAutoCreditUsage),
+            formattedUsageDebit: this.formatBytes(totalUsageDebit),
+            formattedUsageCredit: this.formatBytes(totalUsageCredit),
+            formattedUsageQuota: this.formatBytes(totalUsageQuota),
           });
         } else if (userSnapshots.length === 1) {
           // If only one snapshot, add it without usage calculation
           const snapshot = userSnapshots[0];
           enhancedSnapshots.push({
             ...snapshot,
-            calculatedDataUsage: 0,
-            calculatedTimeUsage: 0,
-            calculatedAutoCreditUsage: 0,
-            calculatedUsageDebit: 0,
-            calculatedUsageCredit: 0,
-            calculatedUsageQuota: 0,
-            formattedDataUsage: '0 Bytes',
-            formattedTimeUsage: '0 seconds',
-            formattedAutoCreditUsage: '0 Bytes',
-            formattedUsageDebit: '0 Bytes',
-            formattedUsageCredit: '0 Bytes',
-            formattedUsageQuota: '0 Bytes',
-          });
-        } else {
-          enhancedSnapshots.push({
-            ...userSnapshots[0],
             calculatedDataUsage: 0,
             calculatedTimeUsage: 0,
             calculatedAutoCreditUsage: 0,
@@ -432,7 +334,7 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
    * @param userId The ID of the user to get history for
    * @param startDate Optional start date to filter snapshots (inclusive - greater than or equal to)
    * @param endDate Optional end date to filter snapshots (inclusive - less than or equal to)
-   * @returns Array of UserHistorySnapshot objects with calculated usage
+   * @returns UserHistorySnapshot object with calculated usage for the date range
    */
   async getUserHistory(
     userId: string,
@@ -462,186 +364,79 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
         orderBy: { snapshotDate: 'asc' },
       });
 
-      // If we have at least 2 snapshots, calculate usage
-      let enhancedSnapshots: any[] = [];
+      // If we have at least 2 snapshots, calculate usage chronologically
+      let enhancedSnapshot: any;
 
       if (dbSnapshots.length >= 2) {
-        const firstSnapshot = dbSnapshots[0];
-        const lastSnapshot = dbSnapshots[dbSnapshots.length - 1];
-
-        // Check if snapshots are within the same month
-        const isWithinSameMonth = isSameMonth(
-          firstSnapshot.snapshotDate,
-          lastSnapshot.snapshotDate,
+        // Sort snapshots chronologically (should already be sorted, but ensure it)
+        dbSnapshots.sort(
+          (a, b) =>
+            new Date(a.snapshotDate).getTime() -
+            new Date(b.snapshotDate).getTime(),
         );
 
-        let safeDataUsage = 0;
-        let safeTimeUsage = 0;
-        let safeUsageDebitDiff = 0;
-        let safeUsageCreditDiff = 0;
-        let safeUsageQuotaDiff = 0;
+        const lastSnapshot = dbSnapshots[dbSnapshots.length - 1];
 
-        if (isWithinSameMonth) {
-          // Normal calculation for same month
-          // Calculate data usage (bytes consumed)
-          const firstDataCredit =
-            typeof firstSnapshot.dataCredit === 'bigint'
-              ? firstSnapshot.dataCredit
-              : BigInt(firstSnapshot.dataCredit || 0);
-          const lastDataCredit =
-            typeof lastSnapshot.dataCredit === 'bigint'
-              ? lastSnapshot.dataCredit
-              : BigInt(lastSnapshot.dataCredit || 0);
+        // Calculate total usage by processing all snapshots chronologically
+        let totalDataUsage = 0;
+        let totalTimeUsage = 0;
+        let totalUsageDebit = 0;
+        let totalUsageCredit = 0;
+        let totalUsageQuota = 0;
 
-          // Usage = first - last (since credit decreases as it's used)
-          const dataUsageBigInt = firstDataCredit - lastDataCredit;
-          const dataUsage = Number(dataUsageBigInt);
-          safeDataUsage = dataUsage < 0 ? 0 : dataUsage;
+        // Process snapshots in chronological order to track changes
+        for (let i = 1; i < dbSnapshots.length; i++) {
+          const prevSnapshot = dbSnapshots[i - 1];
+          const currentSnapshot = dbSnapshots[i];
 
-          // Calculate time usage (seconds consumed)
-          const firstTimeCredit =
-            typeof firstSnapshot.timeCredit === 'bigint'
-              ? firstSnapshot.timeCredit
-              : BigInt(firstSnapshot.timeCredit || 0);
-          const lastTimeCredit =
-            typeof lastSnapshot.timeCredit === 'bigint'
-              ? lastSnapshot.timeCredit
-              : BigInt(lastSnapshot.timeCredit || 0);
-
-          // Usage = first - last (since credit decreases as it's used)
-          const timeUsageBigInt = firstTimeCredit - lastTimeCredit;
-          const timeUsage = Number(timeUsageBigInt);
-          safeTimeUsage = timeUsage < 0 ? 0 : timeUsage;
-
-          // Calculate new usage field differences
-          const firstUsageDebit =
-            typeof firstSnapshot.usageDebit === 'bigint'
-              ? firstSnapshot.usageDebit
-              : BigInt(firstSnapshot.usageDebit || 0);
-          const lastUsageDebit =
-            typeof lastSnapshot.usageDebit === 'bigint'
-              ? lastSnapshot.usageDebit
-              : BigInt(lastSnapshot.usageDebit || 0);
-
-          const firstUsageCredit =
-            typeof firstSnapshot.usageCredit === 'bigint'
-              ? firstSnapshot.usageCredit
-              : BigInt(firstSnapshot.usageCredit || 0);
-          const lastUsageCredit =
-            typeof lastSnapshot.usageCredit === 'bigint'
-              ? lastSnapshot.usageCredit
-              : BigInt(lastSnapshot.usageCredit || 0);
-
-          const firstUsageQuota =
-            typeof firstSnapshot.usageQuota === 'bigint'
-              ? firstSnapshot.usageQuota
-              : BigInt(firstSnapshot.usageQuota || 0);
-          const lastUsageQuota =
-            typeof lastSnapshot.usageQuota === 'bigint'
-              ? lastSnapshot.usageQuota
-              : BigInt(lastSnapshot.usageQuota || 0);
-
-          // Calculate usage differences (debit increases, credit decreases)
-          const usageDebitDiff = Number(lastUsageDebit - firstUsageDebit);
-          const usageCreditDiff = Number(firstUsageCredit - lastUsageCredit); // Credit consumed
-          const usageQuotaDiff = Number(lastUsageQuota - firstUsageQuota);
-
-          safeUsageDebitDiff = usageDebitDiff < 0 ? 0 : usageDebitDiff;
-          safeUsageCreditDiff = usageCreditDiff < 0 ? 0 : usageCreditDiff;
-          safeUsageQuotaDiff = usageQuotaDiff < 0 ? 0 : usageQuotaDiff;
-        } else {
-          // Cross-month calculation
-          const snapshotsOfStartMonth = dbSnapshots.filter((snapshot) =>
-            isSameMonth(snapshot.snapshotDate, firstSnapshot.snapshotDate),
+          // Calculate period usage (what happened between prev and current snapshot)
+          const periodDataUsage = this.calculateCreditUsage(
+            prevSnapshot.dataCredit,
+            currentSnapshot.dataCredit,
           );
-          const snapshotsOfEndMonth = dbSnapshots.filter((snapshot) =>
-            isSameMonth(snapshot.snapshotDate, lastSnapshot.snapshotDate),
+          const periodTimeUsage = this.calculateCreditUsage(
+            prevSnapshot.timeCredit,
+            currentSnapshot.timeCredit,
+          );
+          const periodUsageDebit = this.calculateDebitUsage(
+            prevSnapshot.usageDebit,
+            currentSnapshot.usageDebit,
+          );
+          const periodUsageCredit = this.calculateCreditUsage(
+            prevSnapshot.usageCredit,
+            currentSnapshot.usageCredit,
+          );
+          const periodUsageQuota = this.calculateDebitUsage(
+            prevSnapshot.usageQuota,
+            currentSnapshot.usageQuota,
           );
 
-          const firstSnapshotOfStartMonth = snapshotsOfStartMonth[0];
-          const firstSnapshotOfEndMonth = snapshotsOfEndMonth[0];
-          const lastSnapshotOfStartMonth =
-            snapshotsOfStartMonth[snapshotsOfStartMonth.length - 1];
-          const lastSnapshotOfEndMonth =
-            snapshotsOfEndMonth[snapshotsOfEndMonth.length - 1];
-
-          // Calculate for start month
-          const startMonthDataUsage = this.calculateCreditUsage(
-            firstSnapshotOfStartMonth.dataCredit,
-            lastSnapshotOfStartMonth.dataCredit,
-          );
-          const startMonthTimeUsage = this.calculateCreditUsage(
-            firstSnapshotOfStartMonth.timeCredit,
-            lastSnapshotOfStartMonth.timeCredit,
-          );
-          const startMonthUsageDebit = this.calculateDebitUsage(
-            lastSnapshotOfStartMonth.usageDebit,
-            firstSnapshotOfStartMonth.usageDebit,
-          );
-          const startMonthUsageCredit = this.calculateCreditUsage(
-            firstSnapshotOfStartMonth.usageCredit,
-            lastSnapshotOfStartMonth.usageCredit,
-          );
-          const startMonthUsageQuota = this.calculateDebitUsage(
-            firstSnapshotOfStartMonth.usageQuota,
-            lastSnapshotOfStartMonth.usageQuota,
-          );
-
-          // Calculate for end month
-          const endMonthDataUsage = this.calculateCreditUsage(
-            firstSnapshotOfEndMonth.dataCredit,
-            lastSnapshotOfEndMonth.dataCredit,
-          );
-          const endMonthTimeUsage = this.calculateCreditUsage(
-            firstSnapshotOfEndMonth.timeCredit,
-            lastSnapshotOfEndMonth.timeCredit,
-          );
-          const endMonthUsageDebit = this.calculateDebitUsage(
-            lastSnapshotOfEndMonth.usageDebit,
-            firstSnapshotOfEndMonth.usageDebit,
-          );
-          const endMonthUsageCredit = this.calculateCreditUsage(
-            firstSnapshotOfEndMonth.usageCredit,
-            lastSnapshotOfEndMonth.usageCredit,
-          );
-          const endMonthUsageQuota = this.calculateDebitUsage(
-            firstSnapshotOfEndMonth.usageQuota,
-            lastSnapshotOfEndMonth.usageQuota,
-          );
-
-          // Sum the two months
-          safeDataUsage = Math.abs(startMonthDataUsage + endMonthDataUsage);
-          safeTimeUsage = Math.abs(startMonthTimeUsage + endMonthTimeUsage);
-          safeUsageDebitDiff = Math.abs(
-            startMonthUsageDebit + endMonthUsageDebit,
-          );
-          safeUsageCreditDiff = Math.abs(
-            startMonthUsageCredit + endMonthUsageCredit,
-          );
-          safeUsageQuotaDiff = Math.abs(
-            startMonthUsageQuota + endMonthUsageQuota,
-          );
+          // Accumulate totals (only positive values represent actual usage)
+          if (periodDataUsage > 0) totalDataUsage += periodDataUsage;
+          if (periodTimeUsage > 0) totalTimeUsage += periodTimeUsage;
+          if (periodUsageDebit > 0) totalUsageDebit += periodUsageDebit;
+          if (periodUsageCredit > 0) totalUsageCredit += periodUsageCredit;
+          if (periodUsageQuota > 0) totalUsageQuota += periodUsageQuota;
         }
 
-        // Add all snapshots with calculated usage info
-        const snapshot = dbSnapshots[dbSnapshots.length - 1];
-        enhancedSnapshots.push({
-          ...snapshot,
-          calculatedDataUsage: safeDataUsage,
-          calculatedTimeUsage: safeTimeUsage,
-          calculatedUsageDebit: safeUsageDebitDiff,
-          calculatedUsageCredit: safeUsageCreditDiff,
-          calculatedUsageQuota: safeUsageQuotaDiff,
-          formattedDataUsage: this.formatBytes(safeDataUsage),
-          formattedTimeUsage: this.formatTime(safeTimeUsage),
-          formattedUsageDebit: this.formatBytes(safeUsageDebitDiff),
-          formattedUsageCredit: this.formatBytes(safeUsageCreditDiff),
-          formattedUsageQuota: this.formatBytes(safeUsageQuotaDiff),
-        });
-      } else {
-        const snapshot = dbSnapshots[dbSnapshots.length - 1];
-
-        enhancedSnapshots.push({
+        // Create enhanced snapshot with calculated totals
+        enhancedSnapshot = {
+          ...lastSnapshot,
+          calculatedDataUsage: totalDataUsage,
+          calculatedTimeUsage: totalTimeUsage,
+          calculatedUsageDebit: totalUsageDebit,
+          calculatedUsageCredit: totalUsageCredit,
+          calculatedUsageQuota: totalUsageQuota,
+          formattedDataUsage: this.formatBytes(totalDataUsage),
+          formattedTimeUsage: this.formatTime(totalTimeUsage),
+          formattedUsageDebit: this.formatBytes(totalUsageDebit),
+          formattedUsageCredit: this.formatBytes(totalUsageCredit),
+          formattedUsageQuota: this.formatBytes(totalUsageQuota),
+        };
+      } else if (dbSnapshots.length === 1) {
+        // If only one snapshot, add it without usage calculation
+        const snapshot = dbSnapshots[0];
+        enhancedSnapshot = {
           ...snapshot,
           calculatedDataUsage: 0,
           calculatedTimeUsage: 0,
@@ -653,10 +448,13 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
           formattedUsageDebit: '0 Bytes',
           formattedUsageCredit: '0 Bytes',
           formattedUsageQuota: '0 Bytes',
-        });
+        };
+      } else {
+        // No snapshots found
+        return null;
       }
 
-      return new UserHistorySnapshotEntity(enhancedSnapshots[0]);
+      return new UserHistorySnapshotEntity(enhancedSnapshot);
     } catch (error) {
       this.logger.error(
         chalk.red('Error fetching user history from database'),
@@ -791,6 +589,11 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
     const lastBigInt =
       typeof lastValue === 'bigint' ? lastValue : BigInt(lastValue || 0);
 
+    // In case the autocredit data is added monthly, the last value will be greater than the first value
+    if (lastBigInt > firstBigInt) {
+      return 0;
+    }
+
     // Usage = first - last (since credit decreases as it's used)
     const usageBigInt = firstBigInt - lastBigInt;
     return Number(usageBigInt);
@@ -810,6 +613,11 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
       typeof firstValue === 'bigint' ? firstValue : BigInt(firstValue || 0);
     const lastBigInt =
       typeof lastValue === 'bigint' ? lastValue : BigInt(lastValue || 0);
+
+    // In case the data is refreshed monthly, the first value will be greater than the last value
+    if (firstBigInt > lastBigInt) {
+      return 0;
+    }
 
     // Usage = last - first (since debit increases over time)
     const usageBigInt = lastBigInt - firstBigInt;
