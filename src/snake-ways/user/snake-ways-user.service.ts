@@ -767,7 +767,7 @@ export class SnakeWaysUserService
       },
       create: {
         id: swUser.UserID,
-        email: `${swUser.Login}@example.com`,
+        email: `${swUser.Login}.${swUser.UserID}@snakeways.local`,
         name: swUser.DisplayName,
         displayName: swUser.DisplayName,
         password: Math.random().toString(36).slice(-8), // Random password for initial creation
@@ -1146,7 +1146,7 @@ export class SnakeWaysUserService
       // Create a UserEntity instance with constructor
       const userEntity = new UserEntity({
         id: swUser.UserID,
-        email: `${swUser.Login}@example.com`,
+        email: `${swUser.Login}.${swUser.UserID}@snakeways.local`,
         name: swUser.DisplayName,
         displayName: swUser.DisplayName,
         password: '**********', // Password is excluded from responses
