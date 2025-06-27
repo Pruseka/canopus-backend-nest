@@ -51,7 +51,9 @@ WORKDIR /app
 COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=build --chown=nestjs:nodejs /app/package*.json ./
-COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
+
+# Copy the entire prisma directory including migrations
+COPY --chown=nestjs:nodejs ./prisma ./prisma
 
 # Install pnpm for production
 RUN npm install -g pnpm
