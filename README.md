@@ -44,6 +44,8 @@ cd canopus-backend-nest
 
 2. **Create environment file**
 
+you can also paste what we directly sent to you and skip the step below
+
 ```bash
 # Copy the example environment file
 cp .env.example .env
@@ -63,6 +65,11 @@ docker compose up -d
 # - Database: localhost:5434
 # - Swagger: http://localhost:4000/api
 # - Health Check: http://localhost:4000/health
+
+# If anything changed on backend, run the following scripts
+docker compose down
+docker compose build --no-cache
+docker compose up
 ```
 
 ### **🔧 Development with Docker**
@@ -138,13 +145,6 @@ The Dockerfile uses multi-stage builds for optimal production images:
 - **build**: Application build stage
 - **production**: Final optimized runtime image
 
-### **🔒 Security Features**
-
-- Non-root user execution
-- Multi-stage builds for minimal attack surface
-- Health checks for container monitoring
-- Proper secret management via environment variables
-
 ---
 
 ## 🛠️ **Local Development Setup**
@@ -152,7 +152,7 @@ The Dockerfile uses multi-stage builds for optimal production images:
 ### **Prerequisites**
 
 - Node.js 18+
-- pnpm (recommended) or npm
+- pnpm
 - PostgreSQL 13+ (or use Docker)
 
 ### **1. Installation**
@@ -168,29 +168,17 @@ pnpm install
 Create a `.env` file in the root directory:
 
 ```bash
-# Database Configuration
-DATABASE_URL="postgresql://postgres:password@localhost:5434/canopus"
-
-# JWT Authentication
-JWT_SECRET="your-super-secure-jwt-secret-key-min-32-chars"
-JWT_REFRESH_SECRET="your-super-secure-refresh-secret-key-min-32-chars"
-
-# Snake Ways Service Integration
-SNAKE_WAYS_BASE_URL="http://your-snake-ways-service-url"
-SNAKE_WAYS_API_KEY="your-snake-ways-api-key"
-SNAKE_WAYS_USERNAME="your-username"
-SNAKE_WAYS_PASSWORD="your-password"
-
-# Polling Intervals (in minutes)
-SNAKE_WAYS_USER_POLLING_INTERVAL=5
-SNAKE_WAYS_WAN_POLLING_INTERVAL=5
-SNAKE_WAYS_LAN_POLLING_INTERVAL=5
-SNAKE_WAYS_INTERFACE_POLLING_INTERVAL=5
-
-# Application Configuration
-PORT=4000
-NODE_ENV=development
-CORS_ORIGIN="http://localhost:3000"
+DATABASE_URL="postgresql://postgres:password@localhost:5434/canopus?schema=public"
+JWT_SECRET="canpous-jwt"
+JWT_REFRESH_SECRET="canopus-refresh-jwt"
+SNAKE_WAYS_BASE_URL="https://192.168.77.1:3001/api/v1"
+SNAKE_WAYS_API_KEY="95BA3727E9D411EF900E96000020287C"
+SNAKE_WAYS_USERS_POLLING_INTERVAL=30
+SNAKE_WAYS_WAN_POLLING_INTERVAL=30
+SNAKE_WAYS_WAN_USAGE_POLLING_INTERVAL=30
+SNAKE_WAYS_LAN_POLLING_INTERVAL=30
+SNAKE_WAYS_LAN_USAGE_POLLING_INTERVAL=30
+SNAKE_WAYS_INTERFACE_POLLING_INTERVAL=30
 ```
 
 ### **3. Database Setup**
@@ -201,9 +189,6 @@ pnpm run db:dev:up
 
 # Run database migrations
 pnpm run prisma:dev:deploy
-
-# Optional: Seed database with sample data
-pnpm run prisma:seed
 ```
 
 ### **4. Start Development Server**
@@ -211,9 +196,6 @@ pnpm run prisma:seed
 ```bash
 # Development mode with hot reload
 pnpm run start:dev
-
-# Debug mode
-pnpm run start:debug
 
 # Production build
 pnpm run build && pnpm run start:prod
@@ -251,15 +233,6 @@ npx prisma migrate reset
 pnpm run prisma:generate
 # or
 npx prisma generate
-```
-
-#### **Database Seeding**
-
-```bash
-# Seed database with initial data
-pnpm run prisma:seed
-# or
-npx prisma db seed
 ```
 
 #### **Prisma Studio - Database GUI**
@@ -304,7 +277,6 @@ pnpm run docker:prisma:studio
 2. **Create Migration**: `pnpm run prisma:migrate`
 3. **Generate Client**: `pnpm run prisma:generate`
 4. **Update TypeScript**: Restart your IDE/development server
-5. **Test Changes**: Run tests and verify functionality
 
 ---
 
@@ -326,74 +298,14 @@ The Snake Ways integration consists of multiple specialized services:
 Each service runs on configurable polling intervals:
 
 ```bash
-# Environment variables for polling intervals (in minutes)
+# Environment variables for polling intervals (in seconds)
 SNAKE_WAYS_USER_POLLING_INTERVAL=5           # User data sync
 SNAKE_WAYS_WAN_POLLING_INTERVAL=5            # WAN configuration sync
 SNAKE_WAYS_LAN_POLLING_INTERVAL=5            # LAN configuration sync
 SNAKE_WAYS_INTERFACE_POLLING_INTERVAL=5      # Network interface sync
 SNAKE_WAYS_WAN_USAGE_POLLING_INTERVAL=5      # WAN usage data sync
 SNAKE_WAYS_LAN_USAGE_POLLING_INTERVAL=5      # LAN usage data sync
-SNAKE_WAYS_USER_SNAPSHOT_POLLING_INTERVAL=60 # User history snapshots
-```
-
-### **🔄 Force Synchronization**
-
-Manual synchronization endpoints for immediate data refresh:
-
-#### **User Synchronization**
-
-```bash
-# Force sync all users
-POST /users/sync
-
-# Example response:
-{
-  "message": "User synchronization completed",
-  "syncedUsers": 25,
-  "errors": 0
-}
-```
-
-#### **WAN Synchronization**
-
-```bash
-# Force sync all WANs
-POST /wans/sync
-
-# Example response:
-{
-  "message": "WAN synchronization completed",
-  "syncedWans": 3,
-  "errors": 0
-}
-```
-
-#### **LAN Synchronization**
-
-```bash
-# Force sync all LANs
-POST /lans/sync
-
-# Example response:
-{
-  "message": "LAN synchronization completed",
-  "syncedLans": 5,
-  "errors": 0
-}
-```
-
-#### **Interface Synchronization**
-
-```bash
-# Force sync all network interfaces
-POST /interfaces/sync
-
-# Example response:
-{
-  "message": "Interface synchronization completed",
-  "syncedInterfaces": 8,
-  "errors": 0
-}
+SNAKE_WAYS_USER_SNAPSHOT_POLLING_INTERVAL=5 # User history snapshots
 ```
 
 ### **🔄 Restart Polling Services**
@@ -575,14 +487,6 @@ pnpm run start:dev
    Solution: Increase SNAKE_WAYS_TIMEOUT or check network connectivity
    ```
 
-#### **Debug Mode**
-
-Enable detailed logging for Snake Ways integration:
-
-```bash
-SNAKE_WAYS_DEBUG=true
-```
-
 ---
 
 ## 🌐 **API Endpoints**
@@ -692,7 +596,7 @@ POST   /lan-usage/restart-polling      # Restart LAN usage polling
 
 ---
 
-## 🧪 **Testing**
+<!-- ## 🧪 **Testing**
 
 ### **Test Configuration**
 
@@ -720,7 +624,7 @@ docker compose exec canopus-api pnpm run test
 docker compose exec canopus-api pnpm run test:e2e
 ```
 
----
+--- -->
 
 ## 📱 **API Documentation (Swagger)**
 
@@ -822,53 +726,11 @@ POST /wans/sync
 POST /lans/sync
 ```
 
-#### **Authentication Issues**
-
-```bash
-# Verify JWT secrets are set
-echo $JWT_SECRET
-
-# Check token expiration in logs
-# Use /auth/refresh endpoint for new tokens
-```
-
-### **Production Deployment Checklist**
-
-- [ ] Set `NODE_ENV=production`
-- [ ] Configure strong JWT secrets (32+ characters)
-- [ ] Set up production database with proper credentials
-- [ ] Configure Snake Ways service URL and credentials
-- [ ] Set appropriate CORS origins
-- [ ] Enable HTTPS and set `COOKIE_SECURE=true`
-- [ ] Configure monitoring and logging
-- [ ] Set up backup strategy for database
-- [ ] Configure proper resource limits in Docker
-- [ ] Test all Snake Ways integrations
-- [ ] Verify health check endpoints
-
----
-
 ## 📚 **Additional Resources**
 
 - **NestJS Documentation**: https://docs.nestjs.com
 - **Prisma Documentation**: https://www.prisma.io/docs
 - **Docker Documentation**: https://docs.docker.com
 - **PostgreSQL Documentation**: https://www.postgresql.org/docs
-- **JWT Best Practices**: https://auth0.com/blog/a-look-at-the-latest-draft-for-jwt-bcp
 
 ---
-
-## 🤝 **Contributing**
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Update documentation
-6. Submit a pull request
-
----
-
-## 📄 **License**
-
-This project is licensed under the UNLICENSED License.
