@@ -40,6 +40,11 @@ services:
       NODE_ENV: production
       PORT: 4000
       DATABASE_URL: 'postgresql://postgres:password@canopus-dev-db:5432/canopus'
+      POSTGRES_HOST: canopus-dev-db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: canopus
       JWT_SECRET: '${JWT_SECRET:-your-super-secure-jwt-secret-key-min-32-chars-for-production}'
       JWT_REFRESH_SECRET: '${JWT_REFRESH_SECRET:-your-super-secure-refresh-secret-key-min-32-chars-for-production}'
       SNAKE_WAYS_BASE_URL: '${SNAKE_WAYS_BASE_URL:-http://your-snake-ways-service-url}'
@@ -51,6 +56,7 @@ services:
       SNAKE_WAYS_LAN_POLLING_INTERVAL: '${SNAKE_WAYS_LAN_POLLING_INTERVAL:-5}'
       SNAKE_WAYS_INTERFACE_POLLING_INTERVAL: '${SNAKE_WAYS_INTERFACE_POLLING_INTERVAL:-5}'
       CORS_ORIGIN: '${CORS_ORIGIN:-http://localhost:3000}'
+      SEED_DATABASE: '${SEED_DATABASE:-false}'
     volumes:
       - ./logs:/app/logs
     healthcheck:
@@ -63,8 +69,8 @@ services:
         ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 90s
     networks:
       - canopus-network
     env_file:
