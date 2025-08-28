@@ -41,7 +41,7 @@ RUN pnpm run build
 FROM node:20.11.1-alpine AS production
 
 # Install system dependencies and create user
-RUN apk add --no-cache libc6-compat openssl && \
+RUN apk add --no-cache libc6-compat openssl postgresql-client && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
@@ -55,14 +55,20 @@ COPY --from=build --chown=nestjs:nodejs /app/package*.json ./
 # Copy the entire prisma directory including migrations
 COPY --chown=nestjs:nodejs ./prisma ./prisma
 
+# Copy scripts
+COPY --chown=nestjs:nodejs ./scripts ./scripts
+
 # Install pnpm for production
 RUN npm install -g pnpm
 
 # Generate Prisma Client for production
 RUN pnpm dlx prisma generate
 
+# Make entrypoint script executable
+RUN chmod +x ./scripts/docker-entrypoint.sh
+
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
   CMD node -e "require('http').get('http://localhost:4000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
 
 # Switch to non-root user
@@ -71,5 +77,6 @@ USER nestjs
 # Expose port
 EXPOSE 4000
 
-# Start the application
-CMD ["pnpm", "run", "start:migrate:deploy"]
+# Use entrypoint script
+ENTRYPOINT ["./scripts/docker-entrypoint.sh"]
+CMD ["production"]
